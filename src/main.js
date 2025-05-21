@@ -173,7 +173,7 @@ window.onload = function init() {
     gl.uniform3fv(uAmbientLight, flatten(vec3(0.2, 0.2, 0.2)));
     gl.uniform1f(uDiffuseStrength, 0.8);
 
-    sphereData = createSphere(0.015, 12, 12);
+    sphereData = createSphere(0.02, 12, 12);
 
     sphereBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, sphereBuffer);
@@ -187,7 +187,7 @@ window.onload = function init() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphereIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereData.indices), gl.STATIC_DRAW);
 
-    cylinderData = createCylinder(0.008, 0.008, 1.0, 8, 1);
+    cylinderData = createCylinder(0.01, 0.01, 1.0, 8, 1);
 
     cylinderBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
