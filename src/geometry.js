@@ -172,18 +172,6 @@ function createBox(width, height, depth) {
     };
 }
 
-function createCapsule(radius, height, segments = 10) {
-    const capHeight = radius;
-    const cylinder = createCylinder(radius, radius, height, segments, 1);
-    const topSphere = createSphere(radius, segments, segments / 2);
-    const bottomSphere = createSphere(radius, segments, segments / 2);
-
-    translateGeometry(topSphere, [0, height / 2 + capHeight / 2, 0]);
-    translateGeometry(bottomSphere, [0, -height / 2 - capHeight / 2, 0]);
-
-    return mergeGeometries(cylinder, topSphere, bottomSphere);
-}
-
 function createRoundBox(width, height, depth, radius = 0.03, segments = 8) {
     const box = createBox(width - 2 * radius, height - 2 * radius, depth - 2 * radius);
     const corner = createSphere(radius, segments, segments);
