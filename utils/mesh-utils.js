@@ -22,7 +22,7 @@ function mergeGeometries(...geos) {
 
     for (const geo of geos) {
         vertices.push(...geo.vertices);
-        vertices.push(...geo.normals);
+        normals.push(...geo.normals);
 
         for (let idx of geo.indices) {
             indices.push(idx + vertexOffset);
