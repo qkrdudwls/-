@@ -15,6 +15,16 @@ let sphereData, cylinderData;
 
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
 
+let meshLibrary = {};
+
+function initMeshes() {
+    meshLibrary["SPHERE"] = createSphere(0.015, 12, 12);
+    meshLibrary["CYLINDER"] = createCylinder(0.01, 0.01, 0.15, 12, 1);
+    meshLibrary["EDGE"] = createEdge(0.05, 0.05, 0.05);
+    meshLibrary["ROUNDBOX"] = createRoundBox(0.025, 0.15);
+    meshLibrary["HELMET"] = createHelmet(0.09);
+}
+
 function createNode(name, translation, render, sibling = null, child = null) {
     let node = {
         name: name,

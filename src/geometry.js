@@ -110,6 +110,111 @@ function createCylinder(radiusTop, radiusBottom, height, radialSegments, heightS
     };
 }
 
+function createBox(width, height, depth) {
+    const w = width / 2;
+    const h = height / 2;
+    const d = depth / 2;
+
+    const vertices = [
+        -w, -h,  d, 1.0,
+         w, -h,  d, 1.0,
+         w,  h,  d, 1.0,
+        -w,  h,  d, 1.0,
+
+        -w, -h, -d, 1.0,
+        -w,  h, -d, 1.0,
+         w,  h, -d, 1.0,
+         w, -h, -d, 1.0,
+
+        -w,  h, -d, 1.0,
+        -w,  h,  d, 1.0,
+         w,  h,  d, 1.0,
+         w,  h, -d, 1.0,
+
+        -w, -h, -d, 1.0,
+         w, -h, -d, 1.0,
+         w, -h,  d, 1.0,
+        -w, -h,  d, 1.0,
+
+         w, -h, -d, 1.0,
+         w,  h, -d, 1.0,
+         w,  h,  d, 1.0,
+         w, -h,  d, 1.0,
+
+        -w, -h, -d, 1.0,
+        -w, -h,  d, 1.0,
+        -w,  h,  d, 1.0,
+        -w,  h, -d, 1.0
+    ];
+
+    const normals = [
+        0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
+        0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,
+        0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
+        0, -1, 0,  0, -1, 0,  0, -1, 0,  0, -1, 0,
+        1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
+        -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0
+    ];
+
+    const indices = [
+        0, 1, 2, 0, 2, 3,
+        4, 5, 6, 4, 6, 7,
+        8, 9,10, 8,10,11,
+       12,13,14, 12,14,15,
+       16,17,18, 16,18,19,
+       20,21,22, 20,22,23
+    ];
+
+    return {
+        vertices: vertices,
+        normals: normals,
+        indices: indices
+    };
+}
+
+function createCapsule(radius, height, segments = 10) {
+    const capHeight = radius;
+    const cylinder = createCylinder(radius, radius, height, segments, 1);
+    const topSphere = createSphere(radius, segments, segments / 2);
+    const bottomSphere = createSphere(radius, segments, segments / 2);
+
+    translateGeometry(topSphere, [0, height / 2 + capHeight / 2, 0]);
+    translateGeometry(bottomSphere, [0, -height / 2 - capHeight / 2, 0]);
+
+    return mergeGeometries(cylinder, topSphere, bottomSphere);
+}
+
+function createRoundBox(width, height, depth, radius = 0.03, segments = 8) {
+    const box = createBox(width - 2 * radius, height - 2 * radius, depth - 2 * radius);
+    const corner = createSphere(radius, segments, segments);
+    const parts = [box];
+
+    const offsets = [-1, 1];
+    for (let x of offsets) {
+        for (let y of offsets) {
+            for (let z of offsets) {
+                const c = cloneGeometry(corner);
+                translateGeometry(c, [
+                    x * (width / 2 - radius),
+                    y * (height / 2 - radius),
+                    z * (depth / 2 - radius)
+                ]);
+                parts.push(c);
+            }
+        }
+    }
+
+    return mergeGeometries(...parts);
+}
+
+function createHelmet(radius = 0.12) {
+    return createSphere(radius, 24, 24);
+}
+
+function createEdge(width, height, depth) {
+    return createRoundBox(width, height, depth, 0.02);
+}
+
 function calculateCylinderMatrix(from, to) {
     const fromPoint = from.length === 4 ? vec3(from[0], from[1], from[2]) : vec3(from[0], from[1], from[2]);
     const toPoint = to.length === 4 ? vec3(to[0], to[1], to[2]) : vec3(to[0], to[1], to[2]);
