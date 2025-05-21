@@ -132,10 +132,16 @@ function traverse(root) {
 }
 
 function animateTree(node, time) {
-    let angle = Math.sin(time * 0.002) * 30;
+    let armAngle = Math.sin(time * 0.002) * 30;
+    let legAngle = Math.sin(time * 0.002) * 15;
 
-    if (node.name === "LEFT_ARM") node.rotation[2] = angle;
-    if (node.name === "RIGHT_ARM") node.rotation[2] = -angle;
+    if (node.name === "LEFT_ARM") node.rotation[2] = armAngle;
+    if (node.name === "RIGHT_ARM") node.rotation[2] = -armAngle;
+
+    if (node.name === "LEFT_UPLEG") node.rotation[0] = legAngle;
+    if (node.name === "RIGHT_UPLEG") node.rotation[0] = -legAngle;
+
+    if (node.name === "HEAD") node.rotation[1] = Math.sin(time * 0.001) * 10;
 
     if (node.child) animateTree(node.child, time);
     if (node.sibling) animateTree(node.sibling, time);
