@@ -1,74 +1,458 @@
-class BVHParser {
+"use strict";
+
+class BVHLoader {
     constructor() {
-        this.hierarchy = null;
-        this.motion = [];
+        this.hierarchy = [];
+        this.frames = [];
+        this.frameTime = 0;
+        this.jointNameMap = this.createJointNameMap();
     }
 
-    parse(text) {
-        const lines = text.split(/\r?\n/);
-        let index = 0;
+    createJointNameMap() {
+        const map = {
+            "mixamorig:Hips": "HIPS",
+            "mixamorig:Spine": "SPINE",
+            "mixamorig:Spine1": "SPINE1",
+            "mixamorig:Spine2": "SPINE2",
+            "mixamorig:Neck": "NECK",
+            "mixamorig:Head": "HEAD",
+            "mixamorig:HeadTop_End": "HEAD_TOPEND",
+            "mixamorig:LeftShoulder": "LEFT_SHOULDER",
+            "mixamorig:LeftArm": "LEFT_ARM",
+            "mixamorig:LeftForeArm": "LEFT_FOREARM",
+            "mixamorig:LeftHand": "LEFT_HAND",
+            "mixamorig:LeftHandThumb1": "LEFT_THUMB1",
+            "mixamorig:LeftHandThumb2": "LEFT_THUMB2",
+            "mixamorig:LeftHandThumb3": "LEFT_THUMB3",
+            "mixamorig:LeftHandThumb4": "LEFT_THUMB4",
+            "mixamorig:LeftHandIndex1": "LEFT_INDEX1",
+            "mixamorig:LeftHandIndex2": "LEFT_INDEX2",
+            "mixamorig:LeftHandIndex3": "LEFT_INDEX3",
+            "mixamorig:LeftHandIndex4": "LEFT_INDEX4",
+            "mixamorig:LeftHandMiddle1": "LEFT_MIDDLE1",
+            "mixamorig:LeftHandMiddle2": "LEFT_MIDDLE2",
+            "mixamorig:LeftHandMiddle3": "LEFT_MIDDLE3",
+            "mixamorig:LeftHandMiddle4": "LEFT_MIDDLE4",
+            "mixamorig:LeftHandRing1": "LEFT_RING1",
+            "mixamorig:LeftHandRing2": "LEFT_RING2",
+            "mixamorig:LeftHandRing3": "LEFT_RING3",
+            "mixamorig:LeftHandRing4": "LEFT_RING4",
+            "mixamorig:LeftHandPinky1": "LEFT_PINKY1",
+            "mixamorig:LeftHandPinky2": "LEFT_PINKY2",
+            "mixamorig:LeftHandPinky3": "LEFT_PINKY3",
+            "mixamorig:LeftHandPinky4": "LEFT_PINKY4",
+            "mixamorig:RightShoulder": "RIGHT_SHOULDER",
+            "mixamorig:RightArm": "RIGHT_ARM",
+            "mixamorig:RightForeArm": "RIGHT_FOREARM",
+            "mixamorig:RightHand": "RIGHT_HAND",
+            "mixamorig:RightHandThumb1": "RIGHT_THUMB1",
+            "mixamorig:RightHandThumb2": "RIGHT_THUMB2",
+            "mixamorig:RightHandThumb3": "RIGHT_THUMB3",
+            "mixamorig:RightHandThumb4": "RIGHT_THUMB4",
+            "mixamorig:RightHandIndex1": "RIGHT_INDEX1",
+            "mixamorig:RightHandIndex2": "RIGHT_INDEX2",
+            "mixamorig:RightHandIndex3": "RIGHT_INDEX3",
+            "mixamorig:RightHandIndex4": "RIGHT_INDEX4",
+            "mixamorig:RightHandMiddle1": "RIGHT_MIDDLE1",
+            "mixamorig:RightHandMiddle2": "RIGHT_MIDDLE2",
+            "mixamorig:RightHandMiddle3": "RIGHT_MIDDLE3",
+            "mixamorig:RightHandMiddle4": "RIGHT_MIDDLE4",
+            "mixamorig:RightHandRing1": "RIGHT_RING1",
+            "mixamorig:RightHandRing2": "RIGHT_RING2",
+            "mixamorig:RightHandRing3": "RIGHT_RING3",
+            "mixamorig:RightHandRing4": "RIGHT_RING4",
+            "mixamorig:RightHandPinky1": "RIGHT_PINKY1",
+            "mixamorig:RightHandPinky2": "RIGHT_PINKY2",
+            "mixamorig:RightHandPinky3": "RIGHT_PINKY3",
+            "mixamorig:RightHandPinky4": "RIGHT_PINKY4",
+            "mixamorig:LeftUpLeg": "LEFT_UPLEG",
+            "mixamorig:LeftLeg": "LEFT_LEG",
+            "mixamorig:LeftFoot": "LEFT_FOOT",
+            "mixamorig:LeftToeBase": "LEFT_TOEBASE",
+            "mixamorig:LeftToe_End": "LEFT_TOEEND",
+            "mixamorig:RightUpLeg": "RIGHT_UPLEG",
+            "mixamorig:RightLeg": "RIGHT_LEG",
+            "mixamorig:RightFoot": "RIGHT_FOOT",
+            "mixamorig:RightToeBase": "RIGHT_TOEBASE",
+            "mixamorig:RightToe_End": "RIGHT_TOEEND",
+            // Additional mappings - supporting other BVH formats
+            "Hips": "HIPS",
+            "Spine": "SPINE",
+            "Spine1": "SPINE1",
+            "Spine2": "SPINE2",
+            "Neck": "NECK",
+            "Head": "HEAD",
+            "LeftShoulder": "LEFT_SHOULDER",
+            "LeftArm": "LEFT_ARM",
+            "LeftForeArm": "LEFT_FOREARM",
+            "LeftHand": "LEFT_HAND",
+            "RightShoulder": "RIGHT_SHOULDER",
+            "RightArm": "RIGHT_ARM",
+            "RightForeArm": "RIGHT_FOREARM",
+            "RightHand": "RIGHT_HAND",
+            "LeftUpLeg": "LEFT_UPLEG",
+            "LeftLeg": "LEFT_LEG",
+            "LeftFoot": "LEFT_FOOT",
+            "RightUpLeg": "RIGHT_UPLEG",
+            "RightLeg": "RIGHT_LEG",
+            "RightFoot": "RIGHT_FOOT"
+        };
+        return map;
+    }
 
-        if (lines[index].trim() !== "HIERARCHY") {
-        throw new Error("Invalid BVH format: Missing HIERARCHY section.");
+    parse(bvhData) {
+        const lines = bvhData.split('\n');
+        let lineIndex = 0;
+
+        // Skip empty lines
+        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+            lineIndex++;
         }
-        index++;
 
-        this.hierarchy = this.parseHierarchy(lines, index);
+        if (lineIndex >= lines.length || lines[lineIndex].trim() !== "HIERARCHY") {
+            throw new Error("BVH file must start with HIERARCHY");
+        }
+        lineIndex++;
 
-        while (!lines[index].startsWith("MOTION")) index++;
-        index++;
-        this.motion = this.parseMotion(lines, index);
+        const parseJoint = (parentName = null) => {
+            // Skip empty lines
+            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                lineIndex++;
+            }
+            if (lineIndex >= lines.length) return null;
+
+            const jointLine = lines[lineIndex++].trim();
+            const isRoot = jointLine.startsWith("ROOT");
+            const isJoint = jointLine.startsWith("JOINT");
+            const isEndSite = jointLine.startsWith("End Site");
+
+            let jointName;
+            if (isRoot || isJoint) {
+                jointName = jointLine.split(/\s+/)[1];
+            } else if (isEndSite) {
+                jointName = `${parentName}_End`;
+            } else {
+                throw new Error(`Unexpected line: ${jointLine}`);
+            }
+
+            // Skip empty lines
+            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                lineIndex++;
+            }
+            if (lineIndex >= lines.length) return null;
+
+            if (lines[lineIndex++].trim() !== "{") {
+                throw new Error("Expected {");
+            }
+
+            const joint = {
+                name: jointName,
+                parent: parentName,
+                offset: [0, 0, 0],
+                channels: [],
+                channelIndexes: [],
+                children: []
+            };
+
+            // Skip empty lines
+            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                lineIndex++;
+            }
+            if (lineIndex >= lines.length) return null;
+
+            const offsetLine = lines[lineIndex++].trim();
+            if (offsetLine.startsWith("OFFSET")) {
+                const offsetValues = offsetLine.split(/\s+/).slice(1).map(parseFloat);
+                joint.offset = offsetValues;
+            }
+
+            if (!isEndSite) {
+                // Skip empty lines
+                while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                    lineIndex++;
+                }
+                if (lineIndex >= lines.length) return null;
+
+                const channelsLine = lines[lineIndex++].trim();
+                if (channelsLine.startsWith("CHANNELS")) {
+                    const parts = channelsLine.split(/\s+/);
+                    const numChannels = parseInt(parts[1]);
+                    joint.channels = parts.slice(2, 2 + numChannels);
+                }
+            }
+
+            while (lineIndex < lines.length) {
+                // Skip empty lines
+                while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                    lineIndex++;
+                }
+                if (lineIndex >= lines.length) break;
+
+                const nextLine = lines[lineIndex].trim();
+                if (nextLine === "}") {
+                    lineIndex++;
+                    break;
+                } else if (nextLine.startsWith("JOINT") || nextLine.startsWith("End Site")) {
+                    const childJoint = parseJoint(jointName);
+                    if (childJoint) {
+                        joint.children.push(childJoint);
+                    }
+                } else {
+                    lineIndex++;
+                }
+            }
+
+            this.hierarchy.push(joint);
+            return joint;
+        };
+
+        const rootJoint = parseJoint();
+
+        // Find MOTION section
+        while (lineIndex < lines.length) {
+            const line = lines[lineIndex].trim();
+            if (line === "MOTION") {
+                break;
+            }
+            lineIndex++;
+        }
+
+        if (lineIndex >= lines.length) {
+            throw new Error("No MOTION section found");
+        }
+
+        lineIndex++;
+
+        // Skip empty lines
+        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+            lineIndex++;
+        }
+
+        const framesLine = lines[lineIndex++].trim();
+        if (!framesLine.startsWith("Frames:")) {
+            throw new Error(`Expected Frames: but got ${framesLine}`);
+        }
+        const numFrames = parseInt(framesLine.split(/\s+/)[1]);
+
+        // Skip empty lines
+        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+            lineIndex++;
+        }
+
+        const frameTimeLine = lines[lineIndex++].trim();
+        if (!frameTimeLine.startsWith("Frame Time:")) {
+            throw new Error(`Expected Frame Time: but got ${frameTimeLine}`);
+        }
+        this.frameTime = parseFloat(frameTimeLine.split(/\s+/)[2]);
+
+        for (let i = 0; i < numFrames; i++) {
+            // Skip empty lines
+            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
+                lineIndex++;
+            }
+            if (lineIndex >= lines.length) break;
+            
+            const frameLine = lines[lineIndex++].trim();
+            if (frameLine === "") continue;
+            
+            const values = frameLine.split(/\s+/).map(parseFloat);
+            this.frames.push(values);
+        }
+
+        // Calculate channel indices
+        let channelIndex = 0;
+        for (const joint of this.hierarchy) {
+            joint.channelIndexes = [];
+            for (let i = 0; i < joint.channels.length; i++) {
+                joint.channelIndexes.push(channelIndex++);
+            }
+        }
+
+        return {
+            hierarchy: this.hierarchy,
+            frames: this.frames,
+            frameTime: this.frameTime
+        };
+    }
+
+    // Convert to radians
+    degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    applyFrameToModel(frame, modelRoot) {
+        const applyToNode = (bvhJoint, frameData) => {
+            const modelNodeName = this.jointNameMap[bvhJoint.name];
+            if (!modelNodeName) return null;
+
+            const findNode = (node, name) => {
+                if (!node) return null;
+                if (node.name === name) return node;
+                
+                if (node.child) {
+                    const found = findNode(node.child, name);
+                    if (found) return found;
+                }
+                
+                if (node.sibling) {
+                    const found = findNode(node.sibling, name);
+                    if (found) return found;
+                }
+                
+                return null;
+            };
+
+            const modelNode = findNode(modelRoot, modelNodeName);
+            if (!modelNode) return null;
+
+            const rotationValues = [0, 0, 0];
+
+            for (let i = 0; i < bvhJoint.channels.length; i++) {
+                const channelName = bvhJoint.channels[i];
+                const value = frameData[bvhJoint.channelIndexes[i]];
+
+                // BVH angles are in degrees, convert to radians
+                if (channelName === "Xrotation") rotationValues[0] = this.degToRad(value);
+                else if (channelName === "Yrotation") rotationValues[1] = this.degToRad(value);
+                else if (channelName === "Zrotation") rotationValues[2] = this.degToRad(value);
+                
+                // Position data applies only to root node (if needed)
+                else if (channelName === "Xposition" && modelNode.name === "HIPS") modelNode.translation[0] = value / 100;
+                else if (channelName === "Yposition" && modelNode.name === "HIPS") modelNode.translation[1] = value / 100;
+                else if (channelName === "Zposition" && modelNode.name === "HIPS") modelNode.translation[2] = value / 100;
+            }
+
+            modelNode.rotation = rotationValues;
+
+            for (const childJoint of bvhJoint.children) {
+                applyToNode(childJoint, frameData);
+            }
+
+            return modelNode;
+        };
+
+        const rootJoint = this.hierarchy.find(joint => joint.parent === null);
+        if (rootJoint) {
+            return applyToNode(rootJoint, frame);
+        }
         
-        return { hierarchy: this.hierarchy, motion: this.motion };
+        return null;
     }
 
-    parseHierarchy(lines, index) {
-        let stack = [];
-        let root = null;
-
-        while (index < lines.length) {
-        const line = lines[index].trim();
-        index++;
-
-        if (line.startsWith("ROOT") || line.startsWith("JOINT")) {
-            const parts = line.split(" ");
-            const node = { name: parts[1], offset: null, channels: [], children: [] };
-
-            stack.push(node);
-            if (!root) root = node;
-        } else if (line.startsWith("OFFSET")) {
-            const parts = line.split(" ");
-            stack[stack.length - 1].offset = [parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])];
-        } else if (line.startsWith("CHANNELS")) {
-            const parts = line.split(" ");
-            stack[stack.length - 1].channels = parts.slice(2);
-        } else if (line.startsWith("End Site")) {
-            const node = { name: "End Site", offset: null, children: [] };
-            stack[stack.length - 1].children.push(node);
-        } else if (line === "}") {
-            const node = stack.pop();
-            if (stack.length > 0) stack[stack.length - 1].children.push(node);
+    checkHierarchyCompatibility(modelHierarchy) {
+        // Extract all joint names from BVH hierarchy
+        const bvhJointNames = new Set();
+        for (const joint of this.hierarchy) {
+            const mappedName = this.jointNameMap[joint.name];
+            if (mappedName) {
+                bvhJointNames.add(mappedName);
+            }
         }
-        }
-        return root;
-    }
 
-    parseMotion(lines, index) {
-        let motionData = [];
+        // Extract all joint names from model hierarchy
+        const modelJointNames = new Set(Object.keys(modelHierarchy));
         
-        const frameCount = parseInt(lines[index].split(":")[1].trim());
-        index++;
-        const frameTime = parseFloat(lines[index].split(":")[1].trim());
-        index++;
-
-        for (let i = 0; i < frameCount; i++) {
-            const values = lines[index].trim().split(" ").map(parseFloat);
-            motionData.push(values);
-            index++;
-        }
-
-        return { frameCount, frameTime, frames: motionData };
+        // Find joints missing in each hierarchy
+        const missingInBVH = [...modelJointNames].filter(name => !bvhJointNames.has(name));
+        const missingInModel = [...bvhJointNames].filter(name => !modelJointNames.has(name));
+        
+        return {
+            compatible: missingInBVH.length === 0 || missingInModel.length === 0,
+            missingInBVH,
+            missingInModel
+        };
     }
 }
 
-export default BVHParser;
+class BVHAnimationController {
+    constructor(bvhLoader) {
+        this.bvhLoader = bvhLoader;
+        this.currentFrame = 0;
+        this.isPlaying = false;
+        this.lastFrameTime = 0;
+        this.frameTime = bvhLoader.frameTime;
+        this.totalFrames = bvhLoader.frames.length;
+    }
+
+    play() {
+        this.isPlaying = true;
+        this.lastFrameTime = performance.now();
+    }
+
+    pause() {
+        this.isPlaying = false;
+    }
+
+    reset() {
+        this.currentFrame = 0;
+    }
+
+    setFrame(frameIndex) {
+        this.currentFrame = Math.max(0, Math.min(frameIndex, this.totalFrames - 1));
+    }
+
+    update(modelRoot, currentTime) {
+        if (!this.isPlaying) return;
+
+        const deltaTime = (currentTime - this.lastFrameTime) / 1000;
+        if (deltaTime >= this.frameTime) {
+            this.lastFrameTime = currentTime;
+            this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
+            
+            const frameData = this.bvhLoader.frames[this.currentFrame];
+            this.bvhLoader.applyFrameToModel(frameData, modelRoot);
+        }
+    }
+}
+
+// Asynchronously load a BVH file
+async function fetchBVHFile(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to load BVH file: ${response.status} ${response.statusText}`);
+        }
+        return await response.text();
+    } catch (error) {
+        console.error("Error loading BVH file:", error);
+        throw error;
+    }
+}
+
+// Load a BVH file and return an animation controller
+async function loadBVHAnimation(url, modelRoot, modelHierarchy) {
+    try {
+        const bvhText = await fetchBVHFile(url);
+        
+        const loader = new BVHLoader();
+        const bvhData = loader.parse(bvhText);
+        
+        // Check compatibility with the provided model hierarchy
+        if (modelHierarchy) {
+            const compatibilityCheck = loader.checkHierarchyCompatibility(modelHierarchy);
+            if (!compatibilityCheck.compatible) {
+                console.warn("BVH and model hierarchies are not fully compatible:");
+                console.warn("Missing in BVH:", compatibilityCheck.missingInBVH);
+                console.warn("Missing in Model:", compatibilityCheck.missingInModel);
+            }
+        }
+        
+        const controller = new BVHAnimationController(loader);
+        controller.play();
+        
+        return controller;
+    } catch (error) {
+        console.error("Failed to load BVH animation:", error);
+        return null;
+    }
+}
+
+// Export the classes and functions
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        BVHLoader,
+        BVHAnimationController,
+        fetchBVHFile,
+        loadBVHAnimation
+    };
+}

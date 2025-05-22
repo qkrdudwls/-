@@ -239,31 +239,27 @@ function renderJoint(worldMatrix) {
 function renderBone(from, to) {
     gl.useProgram(program);
 
-    try {
-        const cylinderMatrix = calculateCylinderMatrix(from, to);
-        const mvMatrix = mult(modelViewMatrix, cylinderMatrix);
+    const cylinderMatrix = calculateCylinderMatrix(from, to);
+    const mvMatrix = mult(modelViewMatrix, cylinderMatrix);
 
-        gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(mvMatrix));
-        gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
+    gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(mvMatrix));
+    gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
 
-        const normalMatrix = transpose(inverse4(mvMatrix));
-        gl.uniformMatrix4fv(uNormalMatrix, false, flatten(normalMatrix));
+    const normalMatrix = transpose(inverse4(mvMatrix));
+    gl.uniformMatrix4fv(uNormalMatrix, false, flatten(normalMatrix));
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
-        const vPosition = gl.getAttribLocation(program, "vPosition");
-        gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(vPosition);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
+    const vPosition = gl.getAttribLocation(program, "vPosition");
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, cylinderNormalBuffer);
-        const vNormal = gl.getAttribLocation(program, "vNormal");
-        gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(vNormal);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cylinderNormalBuffer);
+    const vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cylinderIndexBuffer);
-        gl.drawElements(gl.TRIANGLES, cylinderData.indices.length, gl.UNSIGNED_SHORT, 0);
-    } catch (error) {
-        console.error("Error rendering bone:", error);
-    }
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cylinderIndexBuffer);
+    gl.drawElements(gl.TRIANGLES, cylinderData.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
 function render(time = 0) {
