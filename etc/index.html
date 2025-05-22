@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang = "en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hierarchical Model</title>
+        <script id="vertex-shader" type="x-shader/x-vertex">
+            attribute vec4 vPosition;
+            attribute vec3 vNormal;
+
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+            uniform mat4 uNormalMatrix;
+
+            uniform vec3 uLightPosition;
+
+            varying vec3 fNormal;
+            varying vec3 fLightDir;
+            varying vec3 fViewDir;
+
+            void main() {
+                vec4 worldPos = uModelViewMatrix * vPosition;
+                gl_Position = uProjectionMatrix * worldPos;
+
+                fNormal = normalize(mat3(uNormalMatrix) * vNormal);
+                fLightDir = normalize(uLightPosition - worldPos.xyz);
+                fViewDir = normalize(-worldPos.xyz);
+            }
+        </script>
+        <script id="fragment-shader" type="x-shader/x-fragment">
+            precision mediump float;
+
+            varying vec3 fNormal;
+            varying vec3 fLightDir;
+            varying vec3 fViewDir;
+
+            uniform vec3 uLightColor;
+            uniform vec3 uAmbientLight;
+            uniform float uDiffuseStrength;
+
+            void main() {
+                vec3 baseColor = vec3(0.4, 0.6, 0.8);
+
+                vec3 ambient = uAmbientLight * baseColor;
+
+                float diffuseFactor = max(dot(fNormal, fLightDir), 0.0);
+                vec3 diffuse = uDiffuseStrength * diffuseFactor * uLightColor * baseColor;
+
+                vec3 halfVector = normalize(fLightDir + fViewDir);
+                float specularFactor = pow(max(dot(fNormal, halfVector), 0.0), 32.0);
+                vec3 specular = 0.2 * specularFactor * uLightColor;
+
+                gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+            }
+        </script>
+        <script src="./utils/webgl-utils.js"></script>
+        <script src="./utils/initShaders.js"></script>
+        <script src="./utils/MV.js"></script>
+        <script src="./utils/matrix-utils.js"></script>
+        <script src="./utils/mesh-utils.js"></script>
+        <script src="BVHParser.js"></script>
+        <script src="./src/model.js"></script>
+        <script src="./src/geometry.js"></script>
+        <script src="./src/main.js"></script>
+    </head>
+    <body>
+        <canvas id="glCanvas" width="500" height="500"></canvas>
+    </body>
+</html>
