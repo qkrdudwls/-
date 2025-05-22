@@ -6,6 +6,7 @@ class BVHLoader {
         this.frames = [];
         this.frameTime = 0;
         this.jointNameMap = this.createJointNameMap();
+        this.coordinateSystem = 'mixamo'; // 좌표계 식별
     }
 
     createJointNameMap() {
@@ -219,12 +220,36 @@ class BVHLoader {
         };
     }
 
+    // 좌표계 변환 함수들
+    convertCoordinateSystem(position, rotation) {
+        // Mixamo는 Y-up, Z-forward 좌표계 사용
+        // 모델이 다른 좌표계를 사용한다면 변환 필요
+        
+        // 위치 변환 (Y와 Z 축 교환, 스케일 조정)
+        const convertedPos = [
+            position[0] / 100,  // X축 스케일 조정
+            position[1] / 100,  // Y축 스케일 조정  
+            -position[2] / 100  // Z축 반전 및 스케일 조정
+        ];
+        
+        // 회전 변환 (축 순서 조정)
+        const convertedRot = [
+            -rotation[0], // X 회전 반전
+            rotation[1],  // Y 회전 유지
+            -rotation[2]  // Z 회전 반전
+        ];
+        
+        return { position: convertedPos, rotation: convertedRot };
+    }
+
     // Convert to radians
     degToRad(degrees) {
         return degrees * Math.PI / 180;
     }
 
     applyFrameToModel(frame, modelRoot) {
+        if (this.printCount === undefined) this.printCount = 0;
+
         const applyToNode = (bvhJoint, frameData) => {
             const modelNodeName = this.jointNameMap[bvhJoint.name];
             if (!modelNodeName) {
@@ -252,37 +277,57 @@ class BVHLoader {
                 return;
             }
 
+            const position = [0, 0, 0];
             const rotationValues = [0, 0, 0];
             let hasPosition = false;
 
+            // 채널 데이터 추출
             for (let i = 0; i < bvhJoint.channels.length; i++) {
                 const channelName = bvhJoint.channels[i];
                 const value = frameData[bvhJoint.channelIndexes[i]];
 
-                // BVH angles are in degrees, convert to radians
-                if (channelName === "Xrotation") {
-                    rotationValues[0] = this.degToRad(value);
-                } else if (channelName === "Yrotation") {
-                    rotationValues[1] = this.degToRad(value);
-                } else if (channelName === "Zrotation") {
-                    rotationValues[2] = this.degToRad(value);
+                // 위치 데이터
+                if (channelName === "Xposition") {
+                    position[0] = value;
+                    hasPosition = true;
+                } else if (channelName === "Yposition") {
+                    position[1] = value;
+                    hasPosition = true;
+                } else if (channelName === "Zposition") {
+                    position[2] = value;
+                    hasPosition = true;
                 }
                 
-                // Position data applies only to root node
-                else if (channelName === "Xposition" && modelNode.name === "HIPS") {
-                    modelNode.translation[0] = value / 100; // Scale adjustment
-                    hasPosition = true;
-                } else if (channelName === "Yposition" && modelNode.name === "HIPS") {
-                    modelNode.translation[1] = value / 100;
-                    hasPosition = true;
-                } else if (channelName === "Zposition" && modelNode.name === "HIPS") {
-                    modelNode.translation[2] = value / 100;
-                    hasPosition = true;
+                // 회전 데이터 (degrees)
+                else if (channelName === "Xrotation") {
+                    rotationValues[0] = value;
+                } else if (channelName === "Yrotation") {
+                    rotationValues[1] = value;
+                } else if (channelName === "Zrotation") {
+                    rotationValues[2] = value;
                 }
             }
+            
+            if (this.printCount < 20) {
+                console.log(`Joint: ${bvhJoint.name}, Frame rotation (deg): X=${rotationValues[0]}, Y=${rotationValues[1]}, Z=${rotationValues[2]}`);
+                this.printCount++;
+            }
+            // 좌표계 변환 적용
+            const converted = this.convertCoordinateSystem(position, rotationValues);
 
-            modelNode.rotation = rotationValues;
+            // 회전값을 라디안으로 변환
+            modelNode.rotation = [
+                this.degToRad(converted.rotation[0]),
+                this.degToRad(converted.rotation[1]),
+                this.degToRad(converted.rotation[2])
+            ];
 
+            // 루트 노드에만 위치 적용
+            if (hasPosition && modelNode.name === "HIPS") {
+                modelNode.translation = converted.position;
+            }
+
+            // 자식 노드들에 재귀적으로 적용
             for (const childJoint of bvhJoint.children) {
                 applyToNode(childJoint, frameData);
             }
@@ -291,6 +336,26 @@ class BVHLoader {
         const rootJoint = this.hierarchy.find(joint => joint.parent === null);
         if (rootJoint) {
             applyToNode(rootJoint, frame);
+        }
+    }
+
+    // 디버깅을 위한 프레임 정보 출력
+    debugFrame(frameIndex) {
+        if (frameIndex >= this.frames.length) return;
+        
+        const frame = this.frames[frameIndex];
+        console.log(`Frame ${frameIndex}:`);
+        
+        let channelIndex = 0;
+        for (const joint of this.hierarchy) {
+            if (joint.channels.length > 0) {
+                console.log(`  ${joint.name}:`);
+                for (let i = 0; i < joint.channels.length; i++) {
+                    const channel = joint.channels[i];
+                    const value = frame[channelIndex++];
+                    console.log(`    ${channel}: ${value}`);
+                }
+            }
         }
     }
 
@@ -327,6 +392,7 @@ class BVHAnimationController {
         this.lastFrameTime = 0;
         this.frameTime = bvhLoader.frameTime * 1000; // Convert to milliseconds
         this.totalFrames = bvhLoader.frames.length;
+        this.playbackSpeed = 1.0; // 재생 속도 조절
     }
 
     play() {
@@ -346,17 +412,38 @@ class BVHAnimationController {
         this.currentFrame = Math.max(0, Math.min(frameIndex, this.totalFrames - 1));
     }
 
+    setPlaybackSpeed(speed) {
+        this.playbackSpeed = Math.max(0.1, Math.min(speed, 3.0));
+    }
+
     update(modelRoot, currentTime) {
         if (!this.isPlaying || this.totalFrames === 0) return;
 
         const deltaTime = currentTime - this.lastFrameTime;
-        if (deltaTime >= this.frameTime) {
+        const adjustedFrameTime = this.frameTime / this.playbackSpeed;
+        
+        if (deltaTime >= adjustedFrameTime) {
             this.lastFrameTime = currentTime;
             this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
             
             const frameData = this.bvhLoader.frames[this.currentFrame];
             this.bvhLoader.applyFrameToModel(frameData, modelRoot);
+            
+            // 디버깅을 위해 특정 프레임 정보 출력 (선택적)
+            if (this.currentFrame === 0) {
+                // this.bvhLoader.debugFrame(0);
+            }
         }
+    }
+
+    // 현재 프레임 정보 반환
+    getCurrentFrameInfo() {
+        return {
+            current: this.currentFrame,
+            total: this.totalFrames,
+            time: this.currentFrame * this.bvhLoader.frameTime,
+            totalTime: this.totalFrames * this.bvhLoader.frameTime
+        };
     }
 }
 
@@ -382,6 +469,12 @@ async function loadBVHAnimation(url, modelRoot, modelHierarchy) {
         const loader = new BVHLoader();
         const bvhData = loader.parse(bvhText);
         
+        console.log("BVH Data loaded:", {
+            totalFrames: bvhData.frames.length,
+            frameTime: bvhData.frameTime,
+            totalJoints: bvhData.hierarchy.length
+        });
+        
         if (modelHierarchy) {
             const compatibilityCheck = loader.checkHierarchyCompatibility(modelHierarchy);
             console.log("BVH ↔ Model compatibility check:", compatibilityCheck);
@@ -394,6 +487,12 @@ async function loadBVHAnimation(url, modelRoot, modelHierarchy) {
         }
         
         const controller = new BVHAnimationController(loader);
+        
+        // 첫 번째 프레임 적용 (초기 포즈)
+        if (bvhData.frames.length > 0) {
+            loader.applyFrameToModel(bvhData.frames[0], modelRoot);
+        }
+        
         controller.play();
         
         return controller;
