@@ -101,27 +101,18 @@ class BVHLoader {
     }
 
     parse(bvhData) {
-        const lines = bvhData.split('\n');
+        const lines = bvhData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
         let lineIndex = 0;
 
-        // Skip empty lines
-        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-            lineIndex++;
-        }
-
-        if (lineIndex >= lines.length || lines[lineIndex].trim() !== "HIERARCHY") {
+        if (lineIndex >= lines.length || lines[lineIndex] !== "HIERARCHY") {
             throw new Error("BVH file must start with HIERARCHY");
         }
         lineIndex++;
 
         const parseJoint = (parentName = null) => {
-            // Skip empty lines
-            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                lineIndex++;
-            }
             if (lineIndex >= lines.length) return null;
 
-            const jointLine = lines[lineIndex++].trim();
+            const jointLine = lines[lineIndex++];
             const isRoot = jointLine.startsWith("ROOT");
             const isJoint = jointLine.startsWith("JOINT");
             const isEndSite = jointLine.startsWith("End Site");
@@ -135,13 +126,9 @@ class BVHLoader {
                 throw new Error(`Unexpected line: ${jointLine}`);
             }
 
-            // Skip empty lines
-            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                lineIndex++;
-            }
             if (lineIndex >= lines.length) return null;
 
-            if (lines[lineIndex++].trim() !== "{") {
+            if (lines[lineIndex++] !== "{") {
                 throw new Error("Expected {");
             }
 
@@ -154,45 +141,23 @@ class BVHLoader {
                 children: []
             };
 
-            // Skip empty lines
-            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                lineIndex++;
-            }
-            if (lineIndex >= lines.length) return null;
-
-            const offsetLine = lines[lineIndex++].trim();
-            if (offsetLine.startsWith("OFFSET")) {
-                const offsetValues = offsetLine.split(/\s+/).slice(1).map(parseFloat);
-                joint.offset = offsetValues;
-            }
-
-            if (!isEndSite) {
-                // Skip empty lines
-                while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                    lineIndex++;
-                }
-                if (lineIndex >= lines.length) return null;
-
-                const channelsLine = lines[lineIndex++].trim();
-                if (channelsLine.startsWith("CHANNELS")) {
-                    const parts = channelsLine.split(/\s+/);
-                    const numChannels = parseInt(parts[1]);
-                    joint.channels = parts.slice(2, 2 + numChannels);
-                }
-            }
-
+            // Parse joint contents
             while (lineIndex < lines.length) {
-                // Skip empty lines
-                while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                    lineIndex++;
-                }
-                if (lineIndex >= lines.length) break;
-
-                const nextLine = lines[lineIndex].trim();
-                if (nextLine === "}") {
+                const line = lines[lineIndex];
+                
+                if (line === "}") {
                     lineIndex++;
                     break;
-                } else if (nextLine.startsWith("JOINT") || nextLine.startsWith("End Site")) {
+                } else if (line.startsWith("OFFSET")) {
+                    const offsetValues = line.split(/\s+/).slice(1).map(parseFloat);
+                    joint.offset = offsetValues;
+                    lineIndex++;
+                } else if (line.startsWith("CHANNELS")) {
+                    const parts = line.split(/\s+/);
+                    const numChannels = parseInt(parts[1]);
+                    joint.channels = parts.slice(2, 2 + numChannels);
+                    lineIndex++;
+                } else if (line.startsWith("JOINT") || line.startsWith("End Site")) {
                     const childJoint = parseJoint(jointName);
                     if (childJoint) {
                         joint.children.push(childJoint);
@@ -209,52 +174,31 @@ class BVHLoader {
         const rootJoint = parseJoint();
 
         // Find MOTION section
-        while (lineIndex < lines.length) {
-            const line = lines[lineIndex].trim();
-            if (line === "MOTION") {
-                break;
-            }
+        while (lineIndex < lines.length && lines[lineIndex] !== "MOTION") {
             lineIndex++;
         }
 
         if (lineIndex >= lines.length) {
             throw new Error("No MOTION section found");
         }
-
         lineIndex++;
 
-        // Skip empty lines
-        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-            lineIndex++;
-        }
-
-        const framesLine = lines[lineIndex++].trim();
+        // Parse frames info
+        const framesLine = lines[lineIndex++];
         if (!framesLine.startsWith("Frames:")) {
             throw new Error(`Expected Frames: but got ${framesLine}`);
         }
         const numFrames = parseInt(framesLine.split(/\s+/)[1]);
 
-        // Skip empty lines
-        while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-            lineIndex++;
-        }
-
-        const frameTimeLine = lines[lineIndex++].trim();
+        const frameTimeLine = lines[lineIndex++];
         if (!frameTimeLine.startsWith("Frame Time:")) {
             throw new Error(`Expected Frame Time: but got ${frameTimeLine}`);
         }
         this.frameTime = parseFloat(frameTimeLine.split(/\s+/)[2]);
 
-        for (let i = 0; i < numFrames; i++) {
-            // Skip empty lines
-            while (lineIndex < lines.length && lines[lineIndex].trim() === "") {
-                lineIndex++;
-            }
-            if (lineIndex >= lines.length) break;
-            
-            const frameLine = lines[lineIndex++].trim();
-            if (frameLine === "") continue;
-            
+        // Parse frame data
+        for (let i = 0; i < numFrames && lineIndex < lines.length; i++) {
+            const frameLine = lines[lineIndex++];
             const values = frameLine.split(/\s+/).map(parseFloat);
             this.frames.push(values);
         }
@@ -283,43 +227,58 @@ class BVHLoader {
     applyFrameToModel(frame, modelRoot) {
         const applyToNode = (bvhJoint, frameData) => {
             const modelNodeName = this.jointNameMap[bvhJoint.name];
-            if (!modelNodeName) return null;
+            if (!modelNodeName) {
+                if (bvhJoint.name.endsWith("End") || bvhJoint.name.includes("_End")) return;
+                console.warn(`No jointNameMap mapping for BVH joint: ${bvhJoint.name}`);
+                return;
+            }
 
             const findNode = (node, name) => {
                 if (!node) return null;
                 if (node.name === name) return node;
                 
-                if (node.child) {
-                    const found = findNode(node.child, name);
-                    if (found) return found;
-                }
-                
-                if (node.sibling) {
-                    const found = findNode(node.sibling, name);
-                    if (found) return found;
-                }
+                const foundInChild = findNode(node.child, name);
+                if (foundInChild) return foundInChild;
+
+                const foundInSibling = findNode(node.sibling, name);
+                if (foundInSibling) return foundInSibling;
                 
                 return null;
             };
 
             const modelNode = findNode(modelRoot, modelNodeName);
-            if (!modelNode) return null;
+            if (!modelNode) {
+                console.warn(`Model node not found for: ${modelNodeName}`);
+                return;
+            }
 
             const rotationValues = [0, 0, 0];
+            let hasPosition = false;
 
             for (let i = 0; i < bvhJoint.channels.length; i++) {
                 const channelName = bvhJoint.channels[i];
                 const value = frameData[bvhJoint.channelIndexes[i]];
 
                 // BVH angles are in degrees, convert to radians
-                if (channelName === "Xrotation") rotationValues[0] = this.degToRad(value);
-                else if (channelName === "Yrotation") rotationValues[1] = this.degToRad(value);
-                else if (channelName === "Zrotation") rotationValues[2] = this.degToRad(value);
+                if (channelName === "Xrotation") {
+                    rotationValues[0] = this.degToRad(value);
+                } else if (channelName === "Yrotation") {
+                    rotationValues[1] = this.degToRad(value);
+                } else if (channelName === "Zrotation") {
+                    rotationValues[2] = this.degToRad(value);
+                }
                 
-                // Position data applies only to root node (if needed)
-                else if (channelName === "Xposition" && modelNode.name === "HIPS") modelNode.translation[0] = value / 100;
-                else if (channelName === "Yposition" && modelNode.name === "HIPS") modelNode.translation[1] = value / 100;
-                else if (channelName === "Zposition" && modelNode.name === "HIPS") modelNode.translation[2] = value / 100;
+                // Position data applies only to root node
+                else if (channelName === "Xposition" && modelNode.name === "HIPS") {
+                    modelNode.translation[0] = value / 100; // Scale adjustment
+                    hasPosition = true;
+                } else if (channelName === "Yposition" && modelNode.name === "HIPS") {
+                    modelNode.translation[1] = value / 100;
+                    hasPosition = true;
+                } else if (channelName === "Zposition" && modelNode.name === "HIPS") {
+                    modelNode.translation[2] = value / 100;
+                    hasPosition = true;
+                }
             }
 
             modelNode.rotation = rotationValues;
@@ -327,16 +286,12 @@ class BVHLoader {
             for (const childJoint of bvhJoint.children) {
                 applyToNode(childJoint, frameData);
             }
-
-            return modelNode;
         };
 
         const rootJoint = this.hierarchy.find(joint => joint.parent === null);
         if (rootJoint) {
-            return applyToNode(rootJoint, frame);
+            applyToNode(rootJoint, frame);
         }
-        
-        return null;
     }
 
     checkHierarchyCompatibility(modelHierarchy) {
@@ -370,7 +325,7 @@ class BVHAnimationController {
         this.currentFrame = 0;
         this.isPlaying = false;
         this.lastFrameTime = 0;
-        this.frameTime = bvhLoader.frameTime;
+        this.frameTime = bvhLoader.frameTime * 1000; // Convert to milliseconds
         this.totalFrames = bvhLoader.frames.length;
     }
 
@@ -392,9 +347,9 @@ class BVHAnimationController {
     }
 
     update(modelRoot, currentTime) {
-        if (!this.isPlaying) return;
+        if (!this.isPlaying || this.totalFrames === 0) return;
 
-        const deltaTime = (currentTime - this.lastFrameTime) / 1000;
+        const deltaTime = currentTime - this.lastFrameTime;
         if (deltaTime >= this.frameTime) {
             this.lastFrameTime = currentTime;
             this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
@@ -427,9 +382,10 @@ async function loadBVHAnimation(url, modelRoot, modelHierarchy) {
         const loader = new BVHLoader();
         const bvhData = loader.parse(bvhText);
         
-        // Check compatibility with the provided model hierarchy
         if (modelHierarchy) {
             const compatibilityCheck = loader.checkHierarchyCompatibility(modelHierarchy);
+            console.log("BVH ↔ Model compatibility check:", compatibilityCheck);
+
             if (!compatibilityCheck.compatible) {
                 console.warn("BVH and model hierarchies are not fully compatible:");
                 console.warn("Missing in BVH:", compatibilityCheck.missingInBVH);
@@ -447,7 +403,6 @@ async function loadBVHAnimation(url, modelRoot, modelHierarchy) {
     }
 }
 
-// Export the classes and functions
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         BVHLoader,
