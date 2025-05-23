@@ -8,12 +8,18 @@ let modelViewMatrix, projectionMatrix;
 let uModelViewMatrix, uProjectionMatrix, uNormalMatrix;
 let vNormal;
 
+let eye = vec3(0.0, 0.3, 2.5);
+let at = vec3(0.0, 0.1, 0.0);
+let up = vec3(0.0, 1.0, 0.0);
+
 let sphereBuffer, cylinderBuffer;
 let sphereIndexBuffer, cylinderIndexBuffer;
 let sphereNormalBuffer, cylinderNormalBuffer;
 let sphereData, cylinderData;
 
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
+
+let lastTime = 0;
 
 function createNode(name, translation, render, sibling = null, child = null) {
     let node = {
@@ -121,22 +127,6 @@ function traverse(root) {
     }
 }
 
-function animateTree(node, time) {
-    let armAngle = Math.sin(time * 0.002) * 30;
-    let legAngle = Math.sin(time * 0.002) * 15;
-
-    if (node.name === "LEFT_ARM") node.rotation[2] = armAngle;
-    if (node.name === "RIGHT_ARM") node.rotation[2] = -armAngle;
-
-    if (node.name === "LEFT_UPLEG") node.rotation[0] = legAngle;
-    if (node.name === "RIGHT_UPLEG") node.rotation[0] = -legAngle;
-
-    if (node.name === "HEAD") node.rotation[1] = Math.sin(time * 0.001) * 10;
-
-    if (node.child) animateTree(node.child, time);
-    if (node.sibling) animateTree(node.sibling, time);
-}
-
 window.onload = function init() {
     const canvas = document.getElementById("glCanvas");
     gl = WebGLUtils.setupWebGL(canvas);
@@ -164,7 +154,6 @@ window.onload = function init() {
     gl.uniform1f(uDiffuseStrength, 0.8);
 
     sphereData = createSphere(0.025, 12, 12);
-
     sphereBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, sphereBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereData.vertices), gl.STATIC_DRAW);
@@ -178,7 +167,6 @@ window.onload = function init() {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereData.indices), gl.STATIC_DRAW);
 
     cylinderData = createCylinder(0.02, 0.02, 1.0, 8, 1);
-
     cylinderBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cylinderData.vertices), gl.STATIC_DRAW);
@@ -193,8 +181,10 @@ window.onload = function init() {
 
     root = buildTreeFromHierarchy(JOINTS, hierarchy, renderJoint);
 
-    modelViewMatrix = lookAt(vec3(0.0, 0.3, 1.5), vec3(0.0, 0.1, 0.0), vec3(0.0, 1.0, 0.0));
+    modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
+
+    animationSystem.startAnimation("frontFlip", 3000, false);
 
     render();
 }
@@ -254,8 +244,13 @@ function renderBone(from, to) {
 
 function render(time = 0) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const deltaTime = time - lastTime;
+    lastTime = time;
 
-    animateTree(root, time);
+    if (animationSystem && animationSystem.isPlaying) {
+        const result = animationSystem.updateAnimation(deltaTime);
+        if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
+    }
 
     traverse(root);
 
