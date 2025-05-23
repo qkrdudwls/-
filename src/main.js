@@ -185,7 +185,8 @@ window.onload = function init() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    animationSystem.startAnimation("frontFlip", null, false);
+    animationSystem.startAnimation("greeting", 2000, true);
+    //animationSystem.startAnimation("frontFlip", null, false);
 
     render();
 }
