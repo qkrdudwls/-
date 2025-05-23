@@ -51,7 +51,7 @@ class AnimationSystem {
             "RIGHT_THUMB1": [0, 0, 0],
             "RIGHT_THUMB2": [0, 0, 0],
             "RIGHT_THUMB3": [0, 0, 0],
-            "RIGHT_THUMBE4": [0, 0, 0],
+            "RIGHT_THUMB4": [0, 0, 0],
             "RIGHT_INDEX1": [0, 0, 0],
             "RIGHT_INDEX2": [0, 0, 0],
             "RIGHT_INDEX3": [0, 0, 0],
@@ -100,7 +100,8 @@ class AnimationSystem {
         
         // 우주복으로 인한 관절 가동범위 제한
         const constraints = {
-            "LEFT_ARM": [-120, 80, -60, 60, -90, 90],  // [minX, maxX, minY, maxY, minZ, maxZ]
+            "HIPS": [-45, 45, -30, 30, -35, 35], // [minX, maxX, minY, maxY, minZ, maxZ]
+            "LEFT_ARM": [-120, 80, -60, 60, -90, 90],  
             "RIGHT_ARM": [-120, 80, -60, 60, -90, 90],
             "LEFT_FOREARM": [0, 140, -30, 30, -45, 45],
             "RIGHT_FOREARM": [0, 140, -30, 30, -45, 45],
@@ -175,10 +176,6 @@ class AnimationSystem {
                 return this.moonWalkAnimation(progress);
             case 'zeroGFloat':
                 return this.zeroGFloatAnimation(progress);
-            case 'sample':
-                return this.sampleAnimation(progress);
-            case 'examine':
-                return this.examineAnimation(progress);
             default:
                 return this.baseRotations;
         }
@@ -188,29 +185,30 @@ class AnimationSystem {
         const gravityMult = this.getGravityMultiplier();
         const rotations = { ...this.baseRotations };
 
-        // 4단계로 세분화된 애니메이션
+        // 4단계로 세분화된 애니메이션 (각 단계의 지속 시간을 명확하게 정의)
         let phase = 0;
         let phaseProgress = 0;
 
         if (progress < 0.15) {
-            phase = 0; // 준비 단계
+            phase = 0; // 준비 단계 (0% ~ 15%)
             phaseProgress = progress / 0.15;
         } else if (progress < 0.3) {
-            phase = 1; // 점프 시작
+            phase = 1; // 점프 시작 (15% ~ 30%)
             phaseProgress = (progress - 0.15) / 0.15;
         } else if (progress < 0.75) {
-            phase = 2; // 공중 회전
+            phase = 2; // 공중 회전 (30% ~ 75%)
             phaseProgress = (progress - 0.3) / 0.45;
         } else {
-            phase = 3; // 착지
+            phase = 3; // 착지 (75% ~ 100%)
             phaseProgress = (progress - 0.75) / 0.25;
         }
 
         switch (phase) {
             case 0: // 준비 - 웅크리기
                 const prepIntensity = this.easeInOut(phaseProgress);
-                const crouchAngle = prepIntensity * 25;
+                const crouchAngle = prepIntensity * 30; // 이미 도(degree) 단위로 유지
                 
+                rotations["HIPS"] = [crouchAngle * 1.2, Math.sin(phaseProgress * Math.PI) * 3, 0];
                 rotations["SPINE"] = [-crouchAngle * 1.2, 0, 0];
                 rotations["SPINE1"] = [-crouchAngle * 0.8, 0, 0];
                 rotations["SPINE2"] = [-crouchAngle * 0.6, 0, 0];
@@ -220,8 +218,8 @@ class AnimationSystem {
                 rotations["RIGHT_LEG"] = [crouchAngle * 2.5, 0, 0];
                 
                 // 팔의 준비 동작
-                rotations["LEFT_ARM"] = [-20 - crouchAngle, 0, -25];
-                rotations["RIGHT_ARM"] = [-20 - crouchAngle, 0, 25];
+                rotations["LEFT_ARM"] = [-20 - prepIntensity * 30, 0, -25];
+                rotations["RIGHT_ARM"] = [-20 - prepIntensity * 30, 0, 25];
                 rotations["LEFT_FOREARM"] = [crouchAngle * 2, 0, 0];
                 rotations["RIGHT_FOREARM"] = [crouchAngle * 2, 0, 0];
                 
@@ -235,6 +233,7 @@ class AnimationSystem {
                 const explosiveForce = launchIntensity * 40;
                 
                 // 폭발적인 신체 확장
+                rotations["HIPS"] = [-explosiveForce * 0.8, Math.sin(phaseProgress * Math.PI) * 8, 0];
                 rotations["SPINE"] = [explosiveForce * 0.5, Math.sin(phaseProgress * Math.PI) * 5, 0];
                 rotations["SPINE1"] = [explosiveForce * 0.3, 0, 0];
                 rotations["LEFT_UPLEG"] = [-explosiveForce * 0.8, 0, -8];
@@ -243,8 +242,8 @@ class AnimationSystem {
                 rotations["RIGHT_LEG"] = [-explosiveForce * 0.6, 0, 0];
                 
                 // 팔의 추진 동작
-                rotations["LEFT_ARM"] = [-80 + explosiveForce, 0, -40];
-                rotations["RIGHT_ARM"] = [-80 + explosiveForce, 0, 40];
+                rotations["LEFT_ARM"] = [-80 + launchIntensity * 40, 0, -40];
+                rotations["RIGHT_ARM"] = [-80 + launchIntensity * 40, 0, 40];
                 rotations["LEFT_FOREARM"] = [20, 0, 0];
                 rotations["RIGHT_FOREARM"] = [20, 0, 0];
                 break;
@@ -255,7 +254,7 @@ class AnimationSystem {
                 const bodyWave = Math.sin(phaseProgress * Math.PI * 3) * 10;
                 
                 // 주요 회전
-                rotations["HIPS"] = [flipRotation, bodyWave * 0.3, 0];
+                rotations["HIPS"] = [flipRotation * 0.8, bodyWave * 0.5, Math.sin(phaseProgress * Math.PI * 2) * 5];
                 rotations["SPINE"] = [flipRotation * 0.4 + bodyWave, Math.sin(phaseProgress * Math.PI * 2) * 8, 0];
                 rotations["SPINE1"] = [flipRotation * 0.3, bodyWave * 0.5, 0];
                 rotations["SPINE2"] = [flipRotation * 0.2, -bodyWave * 0.3, 0];
@@ -281,10 +280,11 @@ class AnimationSystem {
 
             case 3: // 착지
                 const landIntensity = this.easeOut(1 - phaseProgress);
-                const impact = landIntensity * 35 * gravityMult;
+                const impact = landIntensity * 40 * gravityMult;
                 const damping = Math.sin(phaseProgress * Math.PI) * 0.6;
                 
                 // 충격 흡수 자세
+                rotations["HIPS"] = [impact * 1.2, Math.sin(phaseProgress * Math.PI * 2) * 4, 0];
                 rotations["SPINE"] = [impact * 0.8, Math.sin(phaseProgress * Math.PI * 2) * 3, 0];
                 rotations["SPINE1"] = [impact * 0.6, 0, 0];
                 rotations["LEFT_UPLEG"] = [impact * 1.5, 0, -5];
@@ -333,13 +333,14 @@ class AnimationSystem {
                 const prepIntensity = this.easeInOut(phaseProgress);
                 const backwardLean = prepIntensity * 30;
                 
-                rotations["SPINE"] = [backwardLean, 0, 0];
-                rotations["SPINE1"] = [backwardLean * 0.8, Math.sin(phaseProgress * Math.PI) * 3, 0];
-                rotations["SPINE2"] = [backwardLean * 0.6, 0, 0];
-                rotations["LEFT_UPLEG"] = [-backwardLean * 0.5, 0, -8];
-                rotations["RIGHT_UPLEG"] = [-backwardLean * 0.5, 0, 8];
-                rotations["LEFT_LEG"] = [backwardLean * 1.5, 0, 0];
-                rotations["RIGHT_LEG"] = [backwardLean * 1.5, 0, 0];
+                rotations["HIPS"] = [backwardLean * 0.8, Math.sin(phaseProgress * Math.PI) * 4, 0];
+                rotations["SPINE"] = [backwardLean * 0.6, 0, 0];
+                rotations["SPINE1"] = [backwardLean * 0.4, Math.sin(phaseProgress * Math.PI) * 3, 0];
+                rotations["SPINE2"] = [backwardLean * 0.2, 0, 0];
+                rotations["LEFT_UPLEG"] = [-backwardLean * 0.6, 0, -8];
+                rotations["RIGHT_UPLEG"] = [-backwardLean * 0.6, 0, 8];
+                rotations["LEFT_LEG"] = [backwardLean * 1.8, 0, 0];
+                rotations["RIGHT_LEG"] = [backwardLean * 1.8, 0, 0];
                 
                 // 팔을 뒤로 젖히는 준비 동작
                 rotations["LEFT_ARM"] = [40 + backwardLean, 0, -45];
@@ -355,6 +356,7 @@ class AnimationSystem {
                 const launchIntensity = this.easeOut(phaseProgress);
                 const backwardForce = launchIntensity * 45;
                 
+                rotations["HIPS"] = [-backwardForce * 0.5, Math.sin(phaseProgress * Math.PI) * 10, 0];
                 rotations["SPINE"] = [-backwardForce * 0.3, Math.sin(phaseProgress * Math.PI) * 8, 0];
                 rotations["SPINE1"] = [-backwardForce * 0.2, 0, 0];
                 rotations["LEFT_UPLEG"] = [backwardForce, 0, -10];
@@ -374,10 +376,10 @@ class AnimationSystem {
                 const backFlipRotation = -spinIntensity * 360 * gravityMult;
                 const bodyUndulation = Math.sin(phaseProgress * Math.PI * 2.5) * 12;
                 
-                rotations["HIPS"] = [backFlipRotation, bodyUndulation * 0.4, 0];
-                rotations["SPINE"] = [backFlipRotation * 0.4 - bodyUndulation, Math.sin(phaseProgress * Math.PI * 3) * 10, 0];
-                rotations["SPINE1"] = [backFlipRotation * 0.3, -bodyUndulation * 0.5, 0];
-                rotations["SPINE2"] = [backFlipRotation * 0.2, bodyUndulation * 0.3, 0];
+                rotations["HIPS"] = [backFlipRotation * 0.8, bodyUndulation * 0.6, Math.sin(phaseProgress * Math.PI * 3) * 6];
+                rotations["SPINE"] = [backFlipRotation * 0.3 - bodyUndulation, Math.sin(phaseProgress * Math.PI * 3) * 10, 0];
+                rotations["SPINE1"] = [backFlipRotation * 0.2, -bodyUndulation * 0.5, 0];
+                rotations["SPINE2"] = [backFlipRotation * 0.1, bodyUndulation * 0.3, 0];
 
                 // 다리를 몸쪽으로 당기는 동작
                 const legTuck = Math.sin(phaseProgress * Math.PI) * 90;
@@ -403,6 +405,7 @@ class AnimationSystem {
                 const backwardImpact = landIntensity * 40 * gravityMult;
                 const stabilization = Math.sin(phaseProgress * Math.PI) * 0.7;
                 
+                rotations["HIPS"] = [backwardImpact * 0.8, Math.sin(phaseProgress * Math.PI * 3) * 5, 0];
                 rotations["SPINE"] = [-backwardImpact * 0.5, Math.sin(phaseProgress * Math.PI * 3) * 4, 0];
                 rotations["SPINE1"] = [-backwardImpact * 0.3, 0, 0];
                 rotations["LEFT_UPLEG"] = [backwardImpact * 1.2, 0, -8];
@@ -450,6 +453,7 @@ class AnimationSystem {
                 const crouchIntensity = this.easeInOut(phaseProgress);
                 const deepCrouch = crouchIntensity * 55;
                 
+                rotations["HIPS"] = [deepCrouch * 1.0, Math.sin(phaseProgress * Math.PI * 2) * 4, 0];
                 rotations["SPINE"] = [deepCrouch * 0.8, Math.sin(phaseProgress * Math.PI * 2) * 3, 0];
                 rotations["SPINE1"] = [deepCrouch * 0.6, 0, 0];
                 rotations["SPINE2"] = [deepCrouch * 0.4, 0, 0];
@@ -680,7 +684,6 @@ class AnimationSystem {
         return rotations;
     }
 
-    // 새로운 우주 탐사 전용 애니메이션들
     moonWalkAnimation(progress) {
         const gravityMult = this.getGravityMultiplier();
         const rotations = { ...this.baseRotations };
@@ -772,141 +775,6 @@ class AnimationSystem {
         return rotations;
     }
 
-    sampleAnimation(progress) {
-        const rotations = { ...this.baseRotations };
-        
-        // 샘플 채취 동작 (4단계)
-        let phase = 0;
-        let phaseProgress = 0;
-        
-        if (progress < 0.3) {
-            phase = 0; // 접근
-            phaseProgress = progress / 0.3;
-        } else if (progress < 0.6) {
-            phase = 1; // 웅크리기
-            phaseProgress = (progress - 0.3) / 0.3;
-        } else if (progress < 0.8) {
-            phase = 2; // 샘플링
-            phaseProgress = (progress - 0.6) / 0.2;
-        } else {
-            phase = 3; // 일어서기
-            phaseProgress = (progress - 0.8) / 0.2;
-        }
-        
-        const intensity = this.easeInOut(phaseProgress);
-        
-        switch (phase) {
-            case 0: // 샘플 지점으로 접근
-                const approachLean = intensity * 20;
-                rotations["SPINE"] = [approachLean, 0, 0];
-                rotations["SPINE1"] = [approachLean * 0.7, 0, 0];
-                rotations["LEFT_ARM"] = [-approachLean, Math.sin(phaseProgress * Math.PI) * 10, -20];
-                rotations["RIGHT_ARM"] = [-approachLean, -Math.sin(phaseProgress * Math.PI) * 8, 25];
-                rotations["NECK"] = [approachLean * 0.5, Math.sin(phaseProgress * Math.PI * 2) * 3, 0];
-                break;
-                
-            case 1: // 웅크려서 샘플에 접근
-                const crouchIntensity = intensity * 60;
-                rotations["SPINE"] = [crouchIntensity * 0.8, 0, 0];
-                rotations["SPINE1"] = [crouchIntensity * 0.6, 0, 0];
-                rotations["LEFT_UPLEG"] = [crouchIntensity * 1.5, 0, -10];
-                rotations["RIGHT_UPLEG"] = [crouchIntensity * 1.5, 0, 10];
-                rotations["LEFT_LEG"] = [crouchIntensity * 2, 0, 0];
-                rotations["RIGHT_LEG"] = [crouchIntensity * 2, 0, 0];
-                
-                // 한 손으로 균형, 다른 손으로 샘플링 준비
-                rotations["LEFT_ARM"] = [-crouchIntensity * 0.3, 0, -30];
-                rotations["RIGHT_ARM"] = [-crouchIntensity * 0.8, Math.sin(phaseProgress * Math.PI) * 15, 40];
-                rotations["RIGHT_FOREARM"] = [crouchIntensity * 0.8, 0, 0];
-                
-                rotations["NECK"] = [crouchIntensity * 0.6, 0, 0];
-                rotations["HEAD"] = [crouchIntensity * 0.4, Math.sin(phaseProgress * Math.PI * 3) * 5, 0];
-                break;
-                
-            case 2: // 정밀한 샘플 채취 동작
-                const sampleMotion = Math.sin(phaseProgress * Math.PI * 6) * 5;
-                const precision = intensity * 45;
-                
-                rotations["SPINE"] = [precision * 0.8, sampleMotion * 0.5, 0];
-                rotations["LEFT_UPLEG"] = [precision * 1.5, 0, -10];
-                rotations["RIGHT_UPLEG"] = [precision * 1.5, 0, 10];
-                rotations["LEFT_LEG"] = [precision * 2, 0, 0];
-                rotations["RIGHT_LEG"] = [precision * 2, 0, 0];
-                
-                // 정밀 작업을 위한 팔 동작
-                rotations["LEFT_ARM"] = [-precision * 0.3, sampleMotion, -30];
-                rotations["RIGHT_ARM"] = [-precision * 0.9, sampleMotion * 2, 50];
-                rotations["RIGHT_FOREARM"] = [precision * 0.9 + sampleMotion * 3, sampleMotion * 2, 0];
-                rotations["RIGHT_HAND"] = [sampleMotion * 4, sampleMotion * 2, sampleMotion];
-                
-                // 집중하는 머리 자세
-                rotations["NECK"] = [precision * 0.7, sampleMotion * 0.3, 0];
-                rotations["HEAD"] = [precision * 0.5 + sampleMotion, sampleMotion * 0.5, 0];
-                break;
-                
-            case 3: // 샘플 확인 후 일어서기
-                const riseIntensity = (1 - intensity) * 45;
-                rotations["SPINE"] = [riseIntensity * 0.6, 0, 0];
-                rotations["SPINE1"] = [riseIntensity * 0.4, 0, 0];
-                rotations["LEFT_UPLEG"] = [riseIntensity * 1.2, 0, -8];
-                rotations["RIGHT_UPLEG"] = [riseIntensity * 1.2, 0, 8];
-                rotations["LEFT_LEG"] = [riseIntensity * 1.5, 0, 0];
-                rotations["RIGHT_LEG"] = [riseIntensity * 1.5, 0, 0];
-                
-                // 샘플을 들어올리는 동작
-                rotations["LEFT_ARM"] = [-riseIntensity * 0.2, 0, -25];
-                rotations["RIGHT_ARM"] = [-40 + riseIntensity * 0.5, Math.sin(phaseProgress * Math.PI) * 8, 30];
-                rotations["RIGHT_FOREARM"] = [60 + Math.sin(phaseProgress * Math.PI) * 10, 0, 0];
-                
-                rotations["NECK"] = [riseIntensity * 0.3, 0, 0];
-                rotations["HEAD"] = [riseIntensity * 0.2, Math.sin(phaseProgress * Math.PI) * 3, 0];
-                break;
-        }
-        
-        return rotations;
-    }
-
-    examineAnimation(progress) {
-        const rotations = { ...this.baseRotations };
-        
-        // 관찰 및 조사 동작 (호기심 많은 우주비행사의 탐사 자세)
-        const examineWave = Math.sin(progress * Math.PI * 2);
-        const detailFocus = Math.sin(progress * Math.PI * 4);
-        const curiosityGesture = Math.sin(progress * Math.PI * 1.5);
-        
-        // 기본 관찰 자세 - 약간 앞으로 숙인 자세
-        const baseExamine = 25;
-        rotations["SPINE"] = [baseExamine + examineWave * 8, curiosityGesture * 5, 0];
-        rotations["SPINE1"] = [baseExamine * 0.7 + examineWave * 5, curiosityGesture * 3, 0];
-        rotations["SPINE2"] = [baseExamine * 0.5 + examineWave * 3, -curiosityGesture * 2, 0];
-        
-        // 다리는 안정적인 탐사 자세
-        rotations["LEFT_UPLEG"] = [baseExamine * 0.8, 0, -8];
-        rotations["RIGHT_UPLEG"] = [baseExamine * 0.8, 0, 8];
-        rotations["LEFT_LEG"] = [baseExamine * 0.6, 0, 0];
-        rotations["RIGHT_LEG"] = [baseExamine * 0.6, 0, 0];
-        
-        // 양손으로 대상을 자세히 관찰하는 동작
-        rotations["LEFT_ARM"] = [-40 + examineWave * 15, detailFocus * 12, -35 + curiosityGesture * 10];
-        rotations["RIGHT_ARM"] = [-45 + examineWave * 12, -detailFocus * 10, 40 + curiosityGesture * 8];
-        rotations["LEFT_FOREARM"] = [50 + detailFocus * 20, examineWave * 5, 0];
-        rotations["RIGHT_FOREARM"] = [55 + detailFocus * 18, -examineWave * 4, 0];
-        
-        // 손목의 세밀한 움직임 (정밀 관찰)
-        rotations["LEFT_HAND"] = [detailFocus * 8, examineWave * 6, curiosityGesture * 4];
-        rotations["RIGHT_HAND"] = [-detailFocus * 6, -examineWave * 5, -curiosityGesture * 3];
-        
-        // 집중하며 관찰하는 머리와 목의 움직임
-        rotations["NECK"] = [baseExamine * 0.8 + detailFocus * 6, examineWave * 8, curiosityGesture * 3];
-        rotations["HEAD"] = [baseExamine * 0.5 + detailFocus * 4, -examineWave * 5, -curiosityGesture * 2];
-        
-        // 어깨의 자연스러운 움직임
-        rotations["LEFT_SHOULDER"] = [examineWave * 3, detailFocus * 4, -curiosityGesture * 2];
-        rotations["RIGHT_SHOULDER"] = [-examineWave * 2, -detailFocus * 3, curiosityGesture * 2];
-        
-        return rotations;
-    }
-
     // 부드러운 애니메이션 전환을 위한 보간 함수
     interpolateRotations(from, to, factor) {
         const result = {};
@@ -931,11 +799,7 @@ class AnimationSystem {
         
         if (rotations[node.name]) {
             const [x, y, z] = rotations[node.name];
-            node.rotation = vec3(
-                x * Math.PI / 180, // degrees to radians
-                y * Math.PI / 180,
-                z * Math.PI / 180
-            );
+            node.rotation = vec3(x, y, z);
         }
         
         if (node.child) this.applyAnimationToTree(node.child, rotations);
@@ -978,9 +842,7 @@ const ANIMATION_TYPES = {
     JUMP: 'jump',
     WALK: 'walk',
     MOON_WALK: 'moonWalk',      // 달 걷기
-    ZERO_G_FLOAT: 'zeroGFloat', // 무중력 떠다니기
-    SAMPLE: 'sample',           // 샘플 채취
-    EXAMINE: 'examine'          // 관찰 및 조사
+    ZERO_G_FLOAT: 'zeroGFloat' // 무중력 떠다니기
 };
 
 // 편의 함수들
@@ -990,14 +852,6 @@ function playMoonWalk(duration = 4000, loops = true) {
 
 function playZeroGFloat(duration = 6000, loops = true) {
     playAnimation(ANIMATION_TYPES.ZERO_G_FLOAT, duration, loops);
-}
-
-function playSampleCollection(duration = 3000, loops = false) {
-    playAnimation(ANIMATION_TYPES.SAMPLE, duration, loops);
-}
-
-function playExamination(duration = 4000, loops = true) {
-    playAnimation(ANIMATION_TYPES.EXAMINE, duration, loops);
 }
 
 function setSpaceEnvironment(environment) {
@@ -1078,28 +932,4 @@ class AnimationSequence {
     }
 }
 
-// 사용 예시를 위한 사전 정의된 시퀀스들
-function createExplorationSequence() {
-    return new AnimationSequence()
-        .addAnimation(ANIMATION_TYPES.WALK, 2000)
-        .addAnimation(ANIMATION_TYPES.EXAMINE, 3000, false, 500)
-        .addAnimation(ANIMATION_TYPES.SAMPLE, 2500, false, 200)
-        .addAnimation(ANIMATION_TYPES.WALK, 2000, false, 300);
-}
-
-function createMoonExplorationSequence() {
-    setSpaceEnvironment('moon');
-    return new AnimationSequence()
-        .addAnimation(ANIMATION_TYPES.MOON_WALK, 3000)
-        .addAnimation(ANIMATION_TYPES.JUMP, 2000, false, 500)
-        .addAnimation(ANIMATION_TYPES.EXAMINE, 4000, false, 300)
-        .addAnimation(ANIMATION_TYPES.SAMPLE, 3000, false, 200);
-}
-
-function createZeroGSequence() {
-    setSpaceEnvironment('zerog');
-    return new AnimationSequence()
-        .addAnimation(ANIMATION_TYPES.ZERO_G_FLOAT, 4000)
-        .addAnimation(ANIMATION_TYPES.EXAMINE, 3000, false, 1000)
-        .addAnimation(ANIMATION_TYPES.ZERO_G_FLOAT, 3000, false, 500);
-}
+window.animationSystem = animationSystem;
