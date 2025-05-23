@@ -120,11 +120,10 @@ class AnimationSystem {
         this.isPlaying = true;
         this.loops = loops;
         
-        // frontFlip의 경우 물리적 계산에 따른 자동 duration 설정
         if (animationType === 'frontFlip') {
             const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); // 지구 기준
             const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
-            this.animationDuration = totalFlightTime * 1000; // 밀리초로 변환
+            this.animationDuration = totalFlightTime * 1000;
         } else {
             this.animationDuration = duration || 2000;
         }
@@ -142,7 +141,7 @@ class AnimationSystem {
             } else {
                 this.isPlaying = false;
                 this.currentAnimation = null;
-                // 애니메이션 완료 시 정확히 기본 자세로 복원
+
                 return { 
                     rotations: { ...this.baseRotations }, 
                     translations: { ...this.baseTranslations }
@@ -188,10 +187,9 @@ class AnimationSystem {
         // 포물선 운동으로 높이 계산
         let hipsY = Math.max(0, earthInitialVelocity * currentTime - 0.5 * this.gravity * currentTime * currentTime);
         
-        // 미세한 전진 움직임 (점프 시 자연스러운 전진)
+        // 미세한 전진 움직임
         const forwardMotion = 0.03 * Math.sin(progress * Math.PI);
 
-        // **핵심**: 체공 시간에 맞춰 정확히 360도 회전
         // 회전은 지면을 떠날 때 시작해서 착지 직전에 완료
         let globalRotationX = 0;
         
@@ -212,7 +210,7 @@ class AnimationSystem {
         // 자세 변화는 높이와 회전에 따라 동적으로 조절
         let tuckFactor = 0;
         
-        // 높이 기반 자세 조절 (더 자연스러운 움직임)
+        // 높이 기반 자세 조절
         const heightRatio = hipsY / currentJumpHeight;
         const rotationRatio = globalRotationX / 360;
         
@@ -270,8 +268,8 @@ class AnimationSystem {
             rotations["NECK"] = [15 * tuckFactor, 0, 0];
         }
 
-        // **전역 회전은 HIPS(root)에만 적용**
-        // 계층 구조에서 HIPS가 회전하면 모든 자식 노드들이 함께 회전됨
+        // 전역 회전은 HIPS(root)에만 적용
+        // 계층 구조에서 HIPS가 회전하면 모든 자식 노드들이 함께 회전
         rotations["HIPS"][0] = globalRotationX;
 
         translations["HIPS"] = [forwardMotion, hipsY, 0];
