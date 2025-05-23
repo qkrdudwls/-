@@ -114,12 +114,20 @@ class AnimationSystem {
         return Math.sqrt(this.gravity / 9.8);
     }
 
-    startAnimation(animationType, duration = 2000, loops = false) {
+    startAnimation(animationType, duration = null, loops = false) {
         this.currentAnimation = animationType;
         this.animationTime = 0;
-        this.animationDuration = duration;
         this.isPlaying = true;
         this.loops = loops;
+        
+        // frontFlip의 경우 물리적 계산에 따른 자동 duration 설정
+        if (animationType === 'frontFlip') {
+            const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); // 지구 기준
+            const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
+            this.animationDuration = totalFlightTime * 1000; // 밀리초로 변환
+        } else {
+            this.animationDuration = duration || 2000;
+        }
     }
 
     updateAnimation(deltaTime) {
@@ -134,9 +142,10 @@ class AnimationSystem {
             } else {
                 this.isPlaying = false;
                 this.currentAnimation = null;
+                // 애니메이션 완료 시 정확히 기본 자세로 복원
                 return { 
-                    rotations: this.baseRotations, 
-                    translations: this.baseTranslations 
+                    rotations: { ...this.baseRotations }, 
+                    translations: { ...this.baseTranslations }
                 };
             }
         }
@@ -161,113 +170,115 @@ class AnimationSystem {
     }
 
     frontFlipAnimation(progress) {
-        const gravityMult = this.getGravityMultiplier();
         const rotations = { ...this.baseRotations };
         const translations = { ...this.baseTranslations };
 
         // 물리적으로 정확한 점프 계산
-        const jumpHeight = 1.2 / Math.max(gravityMult, 0.1);
-        const totalTime = Math.sqrt(8 * jumpHeight / this.gravity); // 총 비행시간
-        const currentTime = progress * totalTime;
+        // 지구 기준 점프 높이: 1.2m, 초기 속도: 4.85m/s
+        const earthJumpHeight = 1.2;
+        const earthInitialVelocity = Math.sqrt(2 * 9.8 * earthJumpHeight); // ≈ 4.85 m/s
         
-        // 포물선 운동: y = v0*t - 0.5*g*t²
-        const initialVelocity = Math.sqrt(2 * this.gravity * jumpHeight);
-        let hipsY = Math.max(0, initialVelocity * currentTime - 0.5 * this.gravity * currentTime * currentTime);
+        // 현재 중력에서의 점프 높이와 체공 시간
+        const currentJumpHeight = (earthInitialVelocity * earthInitialVelocity) / (2 * Math.max(this.gravity, 0.01));
+        const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
         
-        // 전진 움직임 최소화 (거의 제자리 점프)
-        const forwardMotion = 0.02 * Math.sin(progress * Math.PI);
+        // 현재 시간 (초 단위)
+        const currentTime = progress * totalFlightTime;
+        
+        // 포물선 운동으로 높이 계산
+        let hipsY = Math.max(0, earthInitialVelocity * currentTime - 0.5 * this.gravity * currentTime * currentTime);
+        
+        // 미세한 전진 움직임 (점프 시 자연스러운 전진)
+        const forwardMotion = 0.03 * Math.sin(progress * Math.PI);
 
-        // **핵심 수정**: 전체 몸이 하나의 강체처럼 회전하도록 통일된 회전값 사용
-        let globalRotationX = 0; // Front flip은 X축 중심 회전
+        // **핵심**: 체공 시간에 맞춰 정확히 360도 회전
+        // 회전은 지면을 떠날 때 시작해서 착지 직전에 완료
+        let globalRotationX = 0;
         
-        if (progress < 0.1) {
-            // Phase 1: 준비 자세 (웅크리기)
-            const phaseT = progress / 0.1;
-            const prep = this.easeInOut(phaseT);
+        // 지면에서 떠난 순간부터 착지 직전까지만 회전
+        if (hipsY > 0.01) {
+            // 체공 구간에서만 회전 진행
+            const airborneStart = earthInitialVelocity / Math.max(this.gravity, 0.01) - Math.sqrt((earthInitialVelocity * earthInitialVelocity) - (2 * this.gravity * 0.01)) / Math.max(this.gravity, 0.01);
+            const airborneEnd = earthInitialVelocity / Math.max(this.gravity, 0.01) + Math.sqrt((earthInitialVelocity * earthInitialVelocity) - (2 * this.gravity * 0.01)) / Math.max(this.gravity, 0.01);
             
-            // 몸 전체를 약간 뒤로 기울이기 (도약 준비)
-            globalRotationX = -10 * prep;
+            if (currentTime >= airborneStart && currentTime <= airborneEnd) {
+                const airborneProgress = (currentTime - airborneStart) / (airborneEnd - airborneStart);
+                globalRotationX = Math.min(airborneProgress * 360, 360);
+            } else if (currentTime > airborneEnd) {
+                globalRotationX = 360;
+            }
+        }
+        
+        // 자세 변화는 높이와 회전에 따라 동적으로 조절
+        let tuckFactor = 0;
+        
+        // 높이 기반 자세 조절 (더 자연스러운 움직임)
+        const heightRatio = hipsY / currentJumpHeight;
+        const rotationRatio = globalRotationX / 360;
+        
+        if (heightRatio < 0.15 && rotationRatio < 0.1) {
+            // Phase 1: 준비 및 이륙 (지면 근처, 회전 시작 전)
+            const phaseT = Math.min(heightRatio / 0.15, rotationRatio / 0.1);
+            const prep = this.easeOut(phaseT);
             
-            // 다리 굽히기 (힘 모으기)
-            rotations["LEFT_UPLEG"] = [60 * prep, 0, -3];
-            rotations["RIGHT_UPLEG"] = [60 * prep, 0, 3];
-            rotations["LEFT_LEG"] = [100 * prep, 0, 0];
-            rotations["RIGHT_LEG"] = [100 * prep, 0, 0];
+            rotations["LEFT_UPLEG"] = [30 * prep, 0, -3];
+            rotations["RIGHT_UPLEG"] = [30 * prep, 0, 3];
+            rotations["LEFT_LEG"] = [45 * prep, 0, 0];
+            rotations["RIGHT_LEG"] = [45 * prep, 0, 0];
             
-            // 팔을 뒤로 젖히기 (추진력 준비)
-            rotations["LEFT_ARM"] = [-30 * prep, 0, -10];
-            rotations["RIGHT_ARM"] = [-30 * prep, 0, 10];
+            rotations["LEFT_ARM"] = [-15 * prep, 0, -10];
+            rotations["RIGHT_ARM"] = [-15 * prep, 0, 10];
             
-        } else if (progress < 0.9) {
-            // Phase 2: 회전 단계 (10-90%)
-            const phaseT = (progress - 0.1) / 0.8;
+        } else if (rotationRatio > 0.1 && rotationRatio < 0.85) {
+            // Phase 2: 공중에서 턱 자세 (회전 중)
+            const phaseT = (rotationRatio - 0.1) / 0.75;
+            tuckFactor = Math.sin(phaseT * Math.PI * 0.8); // 부드러운 턱 곡선
             
-            // **핵심**: 전체 몸이 함께 회전 (360도 완전 회전)
-            globalRotationX = this.easeInOut(phaseT) * 360;
+            rotations["LEFT_UPLEG"] = [30 + (90 * tuckFactor), 0, -5];
+            rotations["RIGHT_UPLEG"] = [30 + (90 * tuckFactor), 0, 5];
+            rotations["LEFT_LEG"] = [45 + (115 * tuckFactor), 0, 0];
+            rotations["RIGHT_LEG"] = [45 + (115 * tuckFactor), 0, 0];
             
-            // 몸을 둥글게 말기 (tuck position) - 회전 속도 증가
-            const tuckFactor = Math.sin(phaseT * Math.PI) * 0.8;
+            rotations["LEFT_ARM"] = [-15 + (115 * tuckFactor), 0, -10 + (50 * tuckFactor)];
+            rotations["RIGHT_ARM"] = [-15 + (115 * tuckFactor), 0, 10 - (50 * tuckFactor)];
+            rotations["LEFT_FOREARM"] = [90 * tuckFactor, 0, 0];
+            rotations["RIGHT_FOREARM"] = [90 * tuckFactor, 0, 0];
             
-            // 다리를 가슴 쪽으로 당기기
-            rotations["LEFT_UPLEG"] = [120 * tuckFactor + 20, 0, -5];
-            rotations["RIGHT_UPLEG"] = [120 * tuckFactor + 20, 0, 5];
-            rotations["LEFT_LEG"] = [140 * tuckFactor, 0, 0];
-            rotations["RIGHT_LEG"] = [140 * tuckFactor, 0, 0];
+            rotations["SPINE"] = [25 * tuckFactor, 0, 0];
+            rotations["SPINE1"] = [20 * tuckFactor, 0, 0];
+            rotations["NECK"] = [15 * tuckFactor, 0, 0];
             
-            // 팔로 다리 감싸기
+        } else if (rotationRatio >= 0.85 || heightRatio < 0.2) {
+            // Phase 3: 착지 준비 (회전 완료 또는 착지 임박)
+            const phaseT = Math.max((rotationRatio - 0.85) / 0.15, (0.2 - heightRatio) / 0.2);
+            const landing = this.easeOut(Math.min(phaseT, 1.0));
+            tuckFactor = Math.max(0, 1 - landing);
+            
+            // 착지할 때 기본 자세로 부드럽게 전환
+            rotations["LEFT_UPLEG"] = [120 * tuckFactor, 0, -5 * tuckFactor];
+            rotations["RIGHT_UPLEG"] = [120 * tuckFactor, 0, 5 * tuckFactor];
+            rotations["LEFT_LEG"] = [160 * tuckFactor, 0, 0];
+            rotations["RIGHT_LEG"] = [160 * tuckFactor, 0, 0];
+            
             rotations["LEFT_ARM"] = [100 * tuckFactor, 0, 40 * tuckFactor];
             rotations["RIGHT_ARM"] = [100 * tuckFactor, 0, -40 * tuckFactor];
-            rotations["LEFT_FOREARM"] = [130 * tuckFactor, 0, 0];
-            rotations["RIGHT_FOREARM"] = [130 * tuckFactor, 0, 0];
+            rotations["LEFT_FOREARM"] = [90 * tuckFactor, 0, 0];
+            rotations["RIGHT_FOREARM"] = [90 * tuckFactor, 0, 0];
             
-            // 상체도 둥글게
-            rotations["SPINE"] = [20 * tuckFactor, 0, 0];
-            rotations["SPINE1"] = [15 * tuckFactor, 0, 0];
-            rotations["NECK"] = [10 * tuckFactor, 0, 0];
-            
-        } else {
-            // Phase 3: 착지 준비 (90-100%)
-            const phaseT = (progress - 0.9) / 0.1;
-            const landing = this.easeOut(phaseT);
-            
-            // 회전 완료 후 정상 자세로 복귀
-            globalRotationX = 360 * (1 - landing * 0.3); // 약간의 잔여 회전
-            
-            // 착지를 위해 몸 펴기
-            const extend = landing;
-            rotations["LEFT_UPLEG"] = [15 * (1-extend), 0, -2 * (1-extend)];
-            rotations["RIGHT_UPLEG"] = [15 * (1-extend), 0, 2 * (1-extend)];
-            rotations["LEFT_LEG"] = [30 * (1-extend), 0, 0];
-            rotations["RIGHT_LEG"] = [30 * (1-extend), 0, 0];
-            
-            // 팔 펼치기 (균형 잡기)
-            rotations["LEFT_ARM"] = [5 * (1-extend), 0, -15 * (1-extend)];
-            rotations["RIGHT_ARM"] = [5 * (1-extend), 0, 15 * (1-extend)];
-            rotations["LEFT_FOREARM"] = [10 * (1-extend), 0, 0];
-            rotations["RIGHT_FOREARM"] = [10 * (1-extend), 0, 0];
+            rotations["SPINE"] = [25 * tuckFactor, 0, 0];
+            rotations["SPINE1"] = [20 * tuckFactor, 0, 0];
+            rotations["NECK"] = [15 * tuckFactor, 0, 0];
         }
 
-        // **핵심 수정**: 모든 주요 관절에 동일한 전역 회전 적용 (강체처럼)
-        rotations["HIPS"][0] += globalRotationX;
-        rotations["SPINE"][0] += globalRotationX * 0.95;
-        rotations["SPINE1"][0] += globalRotationX * 0.9;
-        rotations["SPINE2"][0] += globalRotationX * 0.85;
-        rotations["NECK"][0] += globalRotationX * 0.8;
-        rotations["HEAD"][0] += globalRotationX * 0.75;
-        
-        // 사지도 몸과 함께 회전
-        rotations["LEFT_UPLEG"][0] += globalRotationX * 0.7;
-        rotations["RIGHT_UPLEG"][0] += globalRotationX * 0.7;
-        rotations["LEFT_LEG"][0] += globalRotationX * 0.6;
-        rotations["RIGHT_LEG"][0] += globalRotationX * 0.6;
-        rotations["LEFT_ARM"][0] += globalRotationX * 0.8;
-        rotations["RIGHT_ARM"][0] += globalRotationX * 0.8;
+        // **전역 회전은 HIPS(root)에만 적용**
+        // 계층 구조에서 HIPS가 회전하면 모든 자식 노드들이 함께 회전됨
+        rotations["HIPS"][0] = globalRotationX;
 
         translations["HIPS"] = [forwardMotion, hipsY, 0];
 
         return { rotations, translations };
     }
-
+    
     applyAnimationToTree(node, rotations, translations) {
         if (!node) return;
         
