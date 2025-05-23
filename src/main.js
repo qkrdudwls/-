@@ -130,7 +130,7 @@ function traverse(root) {
 window.onload = function init() {
     const canvas = document.getElementById("glCanvas");
     gl = WebGLUtils.setupWebGL(canvas);
-    if (!gl) { alert("WebGL is not available") };
+    if (!gl) alert("WebGL is not available");
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -154,6 +154,8 @@ window.onload = function init() {
     gl.uniform1f(uDiffuseStrength, 0.8);
 
     sphereData = createSphere(0.025, 12, 12);
+    cylinderData = createCylinder(0.02, 0.02, 1.0, 8, 1);
+
     sphereBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, sphereBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereData.vertices), gl.STATIC_DRAW);
@@ -166,7 +168,6 @@ window.onload = function init() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphereIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereData.indices), gl.STATIC_DRAW);
 
-    cylinderData = createCylinder(0.02, 0.02, 1.0, 8, 1);
     cylinderBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cylinderData.vertices), gl.STATIC_DRAW);
@@ -244,6 +245,7 @@ function renderBone(from, to) {
 
 function render(time = 0) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
     const deltaTime = time - lastTime;
     lastTime = time;
 
