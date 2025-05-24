@@ -1349,12 +1349,12 @@ const ANIMATION_TYPES = {
 
 function setSpaceEnvironment(environment) {
     switch(environment.toLowerCase()) {
-        case 'mercury':
-            setGravity(GRAVITY_PRESETS.MERCURY);
-            break;
-        case 'venus':
-            setGravity(GRAVITY_PRESETS.VENUS);
-            break;
+	case 'mercury':
+	    setGravity(GRAVITY_PRESETS.MERCURY);
+	    break;
+	case 'venus':
+	    setGravity(GRAVITY_PRESETS.VENUS);
+	    break;
         case 'earth':
             setGravity(GRAVITY_PRESETS.EARTH);
             break;
@@ -1367,18 +1367,35 @@ function setSpaceEnvironment(environment) {
         case 'jupiter':
             setGravity(GRAVITY_PRESETS.JUPITER);
             break;
-        case 'saturn':
-            setGravity(GRAVITY_PRESETS.SATURN);
+	case 'saturn':
+	    setGravity(GRAVITY_PRESETS.SATURN);
+	    break;
+	case 'uranus':
+	    setGravity(GRAVITY_PRESETS.URANUS);
+	    break;
+	case 'nepture':
+	    setGravity(GRAVITY_PRESETS.NEPTUNE);
+	    break;
+        case 'space':
+        case 'zerog':
+            setGravity(GRAVITY_PRESETS.ZERO_G);
             break;
-        case 'uranus':
-            setGravity(GRAVITY_PRESETS.URANUS);
-            break;
-        case 'neptune':
-            setGravity(GRAVITY_PRESETS.NEPTUNE);
+        case 'asteroid':
+            setGravity(GRAVITY_PRESETS.CERES);
             break;
         default:
             setGravity(GRAVITY_PRESETS.EARTH);
     }
+    const buttons = document.querySelectorAll('#planets button');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase() === environment.toLowerCase()) {
+            btn.classList.add('active');
+        }
+    });
 }
 
 window.animationSystem = animationSystem;
+window.playAnimation = playAnimation;
+window.setGravity = setGravity;
+window.setSpaceEnvironment = setSpaceEnvironment;
