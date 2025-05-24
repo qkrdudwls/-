@@ -201,7 +201,7 @@ window.onload = function init() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    setMoon();
+    setMars();
     animationSystem.setWalkingDirection(0, 0, 1);
     animationSystem.startAnimation("jump", null, false);
 

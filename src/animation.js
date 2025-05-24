@@ -130,10 +130,6 @@ class AnimationSystem {
             const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); 
             const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
             this.animationDuration = totalFlightTime * 1000;
-        } else if (animationType === 'failedFrontFlip') {
-            const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); 
-            const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
-            this.animationDuration = totalFlightTime * 3000;
         } else if (animationType === 'jump') {
             // jumpAnimation과 동일한 물리 계산 사용
             const earthJumpHeight = 0.8; // jumpAnimation과 동일한 0.8m 점프
@@ -249,8 +245,6 @@ class AnimationSystem {
                 return this.frontFlipAnimation(progress);
             case 'backFlip':
                 return this.backFlipAnimation(progress);
-            case 'failedFrontFlip':
-                return this.failedFrontFlipAnimation(progress);
             default:
                 return { 
                     rotations: this.baseRotations, 
@@ -1491,8 +1485,7 @@ const ANIMATION_TYPES = {
     JUMP: 'jump',
     SPACE_WALK: 'spaceWalk',
     FRONT_FLIP: 'frontFlip',
-    BACK_FLIP: 'backFlip',
-    FAILED_FRONT_FLIP: 'failedFrontFlip'
+    BACK_FLIP: 'backFlip'
 };
 
 function setSpaceEnvironment(environment) {
