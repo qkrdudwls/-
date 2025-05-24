@@ -242,3 +242,42 @@ function calculateCylinderMatrix(from, to) {
 
     return mult(translationMatrix, mult(rotationMatrix, scaleMatrix));
 }
+
+function createClosedCylinder(radiusTop, radiusBottom, height, radialSegments, heightSegments) {
+    const cyl = createCylinder(radiusTop, radiusBottom, height, radialSegments, heightSegments);
+
+    let vertices = [...cyl.vertices];
+    let normals = [...cyl.normals];
+    let indices = [...cyl.indices];
+
+    // Top center
+    const topCenterIndex = vertices.length / 4;
+    vertices.push(0, height, 0, 1.0);
+    normals.push(0, 1, 0);
+
+    // Bottom center
+    const bottomCenterIndex = topCenterIndex + 1;
+    vertices.push(0, 0, 0, 1.0);
+    normals.push(0, -1, 0);
+
+    // Top cap
+    for (let i = 0; i < radialSegments; i++) {
+        const curr = i;
+        const next = (i + 1) % radialSegments;
+        indices.push(topCenterIndex, curr, next);
+    }
+
+    // Bottom cap
+    const offset = (heightSegments) * (radialSegments + 1);
+    for (let i = 0; i < radialSegments; i++) {
+        const curr = offset + i;
+        const next = offset + (i + 1) % radialSegments;
+        indices.push(bottomCenterIndex, next, curr);
+    }
+
+    return {
+        vertices: vertices,
+        normals: normals,
+        indices: indices
+    };
+}

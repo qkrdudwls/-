@@ -16,6 +16,11 @@ class AnimationSystem {
         // 전체 몸의 중심점 (center of mass)
         this.centerOfMass = vec3(0, 0, 0);
         this.initialHipsHeight = 0.0;
+
+        this.accumulatePosition = vec3(0, 0, 0);
+        this.walkingDirection = vec3(0, 0, 1);
+        this.walkSpeed = 1.0;
+        this.runSpeed = 2.0;
     }
 
     getBaseRotations() {
@@ -120,12 +125,32 @@ class AnimationSystem {
         this.isPlaying = true;
         this.loops = loops;
         
+        // 각 애니메이션 타입별 적절한 지속시간 설정
         if (animationType === 'frontFlip' || animationType === 'backFlip') {
-            const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); // 지구 기준
+            const earthInitialVelocity = Math.sqrt(2 * 9.8 * 1.2); 
             const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
             this.animationDuration = totalFlightTime * 1000;
+        } else if (animationType === 'jump') {
+            const earthJumpHeight = 0.8; 
+            const earthInitialVelocity = Math.sqrt(2 * 9.8 * earthJumpHeight);
+            const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
+            this.animationDuration = totalFlightTime * 1000;
+        } else if (animationType === 'walk') {
+            this.animationDuration = duration || 3000;
+        } else if (animationType === 'spaceWalk') {
+            const earthStepDuration = 0.8; 
+            const gravityFactor = Math.max(this.gravity, 0.01) / 9.8;
+            const spaceStepDuration = earthStepDuration / Math.sqrt(gravityFactor);
+            const stepsPerAnimation = 4;
+            this.animationDuration = spaceStepDuration * stepsPerAnimation * 1000;
         } else {
             this.animationDuration = duration || 2000;
+        }
+
+        if (animationType === 'walk' || animationType === 'spaceWalk' || animationType === 'spaceRun') {
+            if (!this.accumulatePosition) {
+                this.accumulatePosition = [0, 0, 0];
+            }
         }
     }
 
@@ -140,12 +165,54 @@ class AnimationSystem {
                 this.animationTime = 0;
             } else {
                 this.isPlaying = false;
-                this.currentAnimation = null;
-
-                return { 
-                    rotations: { ...this.baseRotations }, 
-                    translations: { ...this.baseTranslations }
-                };
+                
+                // 이동 애니메이션이 끝날 때는 누적 위치를 영구적으로 업데이트
+                if (['walk', 'spaceWalk'].includes(this.currentAnimation)) {
+                    // 최종 위치 계산
+                    const finalResult = this.calculateAnimationFrame(1.0);
+                    if (finalResult.translations && finalResult.translations["HIPS"]) {
+                        // 현재 애니메이션에서의 상대적 이동량만 누적에 추가
+                        const stepDistance = this.currentAnimation.includes('space') ? 
+                            (this.currentAnimation === 'spaceWalk' ? this.walkSpeed * 0.025 : this.runSpeed * 0.04) :
+                            (this.currentAnimation === 'walk' ? this.walkSpeed * 0.02 : this.runSpeed * 0.03);
+                        
+                        const stepFrequency = this.currentAnimation.includes('space') ?
+                            (this.currentAnimation === 'spaceWalk' ? 1.5 : 2.2) :
+                            (this.currentAnimation === 'walk' ? 2 : 3);
+                        
+                        const totalDistance = stepDistance * stepFrequency;
+                        const deltaX = totalDistance * this.walkingDirection[0];
+                        const deltaZ = totalDistance * this.walkingDirection[2];
+                        
+                        // 누적 위치에 이동량 추가 (영구적으로 적용)
+                        this.accumulatePosition[0] += deltaX;
+                        this.accumulatePosition[2] += deltaZ;
+                    }
+                    
+                    this.currentAnimation = null;
+                    
+                    // 기본 자세로 돌아가되 누적된 위치는 영구 유지
+                    return { 
+                        rotations: { ...this.baseRotations }, 
+                        translations: {
+                            ...this.baseTranslations,
+                            "HIPS": [
+                                this.accumulatePosition[0], 
+                                this.currentAnimation && this.currentAnimation.includes('space') ? 0.05 : 0, 
+                                this.accumulatePosition[2]
+                            ]
+                        }
+                    };
+                } else {
+                    this.currentAnimation = null;
+                    return { 
+                        rotations: { ...this.baseRotations }, 
+                        translations: { 
+                            ...this.baseTranslations,
+                            "HIPS": [this.accumulatePosition[0], 0, this.accumulatePosition[2]]
+                        }
+                    };
+                }
             }
         }
 
@@ -160,6 +227,12 @@ class AnimationSystem {
         switch (this.currentAnimation) {
             case 'greeting':
                 return this.greetingAnimation(progress);
+            case 'walk':
+                return this.walkAnimation(progress);
+            case 'jump':
+                return this.jumpAnimation(progress);
+            case 'spaceWalk':
+                return this.spaceWalkAnimation(progress);
             case 'frontFlip':
                 return this.frontFlipAnimation(progress);
             case 'backFlip':
@@ -307,6 +380,562 @@ class AnimationSystem {
         rotations["LEFT_FOOT"] = [0, 0, 0];
         rotations["RIGHT_FOOT"] = [0, 0, 0];
 
+        return { rotations, translations };
+    }
+
+    setWalkingDirection(x, y, z) {
+        const length = Math.sqrt(x*x + y*y + z*z);
+        if (length > 0) this.walkingDirection = vec3(x / length, y / length, z / length);
+    }
+
+    setMovementSpeed(walkSpeed, runSpeed) {
+        this.walkSpeed = walkSpeed;
+        this.runSpeed = runSpeed;
+    }
+
+    getCurrentPosition() {
+        return vec3(this.accumulatePosition[0], this.accumulatePosition[1], this.accumulatePosition[2]);
+    }
+
+    resetPosition() {
+        this.accumulatePosition = vec3(0, 0, 0);
+    }
+
+    // walkAnimation 함수 - 자연스러운 걷기 동작
+    walkAnimation(progress) {
+        const rotations = { ...this.baseRotations };
+        const translations = { ...this.baseTranslations };
+
+        // 부드러운 시작/끝을 위한 이징
+        let easedProgress = progress;
+        if (progress < 0.1) {
+            // 처음 10%는 부드럽게 시작
+            easedProgress = this.easeOut(progress / 0.1) * 0.1;
+        } else if (progress > 0.9) {
+            // 마지막 10%는 부드럽게 끝
+            const endPhase = (progress - 0.9) / 0.1;
+            easedProgress = 0.9 + this.easeIn(endPhase) * 0.1;
+        }
+
+        // 중력에 따른 걸음 속도 조정 (낮은 중력일수록 느리게)
+        const gravityFactor = this.getGravityMultiplier();
+        const stepFrequency = 2 * gravityFactor; // 기본 2걸음 per cycle
+        const stepProgress = (easedProgress * stepFrequency) % 1.0;
+        
+        // 걸음 주기 (0~0.5: 왼발 앞, 0.5~1.0: 오른발 앞)
+        const isLeftStep = stepProgress < 0.5;
+        const phaseProgress = isLeftStep ? stepProgress * 2 : (stepProgress - 0.5) * 2;
+        
+        // 시작/끝 단계에서 동작 강도 조절
+        let intensityMultiplier = 1.0;
+        if (progress < 0.1) {
+            intensityMultiplier = progress / 0.1;
+        } else if (progress > 0.9) {
+            intensityMultiplier = (1.0 - progress) / 0.1;
+        }
+        
+        // 걸음의 높낮이 (사인파로 자연스러운 보행)
+        const bobHeight = 0.02 * Math.sin(easedProgress * Math.PI * stepFrequency * 2) * intensityMultiplier;
+        const swayX = 0.01 * Math.sin(easedProgress * Math.PI * stepFrequency) * intensityMultiplier;
+        
+        // 다리 동작
+        const legLift = 25 * intensityMultiplier; // 다리 들어올리는 각도
+        const legSwing = 20 * intensityMultiplier; // 다리 앞뒤 스윙
+        
+        if (isLeftStep) {
+            // 왼발이 앞으로
+            const leftLift = Math.sin(phaseProgress * Math.PI) * legLift;
+            const leftSwing = (phaseProgress - 0.5) * legSwing;
+            const rightSwing = -(phaseProgress - 0.5) * legSwing * 0.8;
+            
+            rotations["LEFT_UPLEG"] = [leftSwing, 0, leftLift * 0.1];
+            rotations["LEFT_LEG"] = [Math.max(0, leftLift), 0, 0];
+            rotations["LEFT_FOOT"] = [-leftLift * 0.3, 0, 0];
+            
+            rotations["RIGHT_UPLEG"] = [rightSwing, 0, 0];
+            rotations["RIGHT_LEG"] = [0, 0, 0];
+            rotations["RIGHT_FOOT"] = [0, 0, 0];
+        } else {
+            // 오른발이 앞으로
+            const rightLift = Math.sin(phaseProgress * Math.PI) * legLift;
+            const rightSwing = (phaseProgress - 0.5) * legSwing;
+            const leftSwing = -(phaseProgress - 0.5) * legSwing * 0.8;
+            
+            rotations["RIGHT_UPLEG"] = [rightSwing, 0, -rightLift * 0.1];
+            rotations["RIGHT_LEG"] = [Math.max(0, rightLift), 0, 0];
+            rotations["RIGHT_FOOT"] = [-rightLift * 0.3, 0, 0];
+            
+            rotations["LEFT_UPLEG"] = [leftSwing, 0, 0];
+            rotations["LEFT_LEG"] = [0, 0, 0];
+            rotations["LEFT_FOOT"] = [0, 0, 0];
+        }
+        
+        // 팔 동작 (다리와 반대로)
+        const armSwing = 15 * intensityMultiplier;
+        const armLift = 10 * intensityMultiplier;
+        
+        if (isLeftStep) {
+            // 왼발 앞 -> 오른팔 앞
+            const rightArmSwing = Math.sin(phaseProgress * Math.PI) * armSwing;
+            const leftArmSwing = -Math.sin(phaseProgress * Math.PI) * armSwing * 0.8;
+            
+            rotations["RIGHT_SHOULDER"] = [0, 0, 5 * intensityMultiplier];
+            rotations["RIGHT_ARM"] = [rightArmSwing, 0, 10 * intensityMultiplier];
+            rotations["RIGHT_FOREARM"] = [Math.max(0, rightArmSwing * 0.5), 0, 0];
+            
+            rotations["LEFT_SHOULDER"] = [0, 0, -5 * intensityMultiplier];
+            rotations["LEFT_ARM"] = [leftArmSwing, 0, -10 * intensityMultiplier];
+            rotations["LEFT_FOREARM"] = [Math.max(0, -leftArmSwing * 0.5), 0, 0];
+        } else {
+            // 오른발 앞 -> 왼팔 앞
+            const leftArmSwing = Math.sin(phaseProgress * Math.PI) * armSwing;
+            const rightArmSwing = -Math.sin(phaseProgress * Math.PI) * armSwing * 0.8;
+            
+            rotations["LEFT_SHOULDER"] = [0, 0, -5 * intensityMultiplier];
+            rotations["LEFT_ARM"] = [leftArmSwing, 0, -10 * intensityMultiplier];
+            rotations["LEFT_FOREARM"] = [Math.max(0, leftArmSwing * 0.5), 0, 0];
+            
+            rotations["RIGHT_SHOULDER"] = [0, 0, 5 * intensityMultiplier];
+            rotations["RIGHT_ARM"] = [rightArmSwing, 0, 10 * intensityMultiplier];
+            rotations["RIGHT_FOREARM"] = [Math.max(0, -rightArmSwing * 0.5), 0, 0];
+        }
+        
+        // 자연스러운 손 위치
+        const fingerRelax = 8;
+        ["LEFT", "RIGHT"].forEach(side => {
+            rotations[`${side}_HAND`] = [0, 0, 0];
+            rotations[`${side}_THUMB1`] = [0, 0, side === "LEFT" ? fingerRelax : -fingerRelax];
+            rotations[`${side}_THUMB2`] = [fingerRelax * 0.6, 0, 0];
+            
+            ["INDEX", "MIDDLE", "RING", "PINKY"].forEach(finger => {
+                rotations[`${side}_${finger}1`] = [fingerRelax * 0.4, 0, 0];
+                rotations[`${side}_${finger}2`] = [fingerRelax * 0.6, 0, 0];
+                rotations[`${side}_${finger}3`] = [fingerRelax * 0.4, 0, 0];
+            });
+        });
+        
+        // 상체의 자연스러운 움직임
+        rotations["SPINE"] = [0, swayX * 5, 0];
+        rotations["SPINE1"] = [0, swayX * 3, 0];
+        rotations["NECK"] = [0, -swayX * 2, 0];
+        rotations["HEAD"] = [0, 0, 0];
+        
+        // 앞으로 이동 (걸음에 따른 이동) - 누적 위치 포함
+        const stepDistance = this.walkSpeed * 0.02; // 한 스텝당 이동 거리
+        const totalDistance = easedProgress * stepDistance * stepFrequency;
+        
+        // 현재 프레임에서의 이동량 계산
+        const currentX = totalDistance * this.walkingDirection[0];
+        const currentZ = totalDistance * this.walkingDirection[2];
+        
+        // 누적 위치에 현재 이동량 추가
+        translations["HIPS"] = [
+            this.accumulatePosition[0] + currentX, 
+            bobHeight, 
+            this.accumulatePosition[2] + currentZ
+        ];
+        
+        return { rotations, translations };
+    }
+
+    // jumpAnimation 함수 - 수직 점프 동작
+    jumpAnimation(progress) {
+        const rotations = { ...this.baseRotations };
+        const translations = { ...this.baseTranslations };
+
+        // 물리적으로 정확한 점프 계산
+        const earthJumpHeight = 0.8; // 0.8m 점프
+        const earthInitialVelocity = Math.sqrt(2 * 9.8 * earthJumpHeight);
+        
+        const currentJumpHeight = (earthInitialVelocity * earthInitialVelocity) / (2 * Math.max(this.gravity, 0.01));
+        const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
+        
+        const currentTime = progress * totalFlightTime;
+        let hipsY = Math.max(0, earthInitialVelocity * currentTime - 0.5 * this.gravity * currentTime * currentTime);
+        
+        const heightRatio = hipsY / currentJumpHeight;
+        
+        // 중력에 관계없이 일정한 시간 비율로 Phase 구분
+        const prepDuration = 0.3; // 지구 기준 준비 시간 (초)
+        const prepPhaseRatio = Math.min(prepDuration / totalFlightTime, 0.3); // 최대 30%까지만
+        
+        if (progress < prepPhaseRatio) {
+            // Phase 1: 점프 준비 (쪼그려 앉기) - 고정된 시간 비율
+            const prep = this.easeOut(progress / prepPhaseRatio);
+            
+            // 다리 - 힘을 모으기 위해 구부림
+            rotations["LEFT_UPLEG"] = [45 * prep, 0, -5];
+            rotations["RIGHT_UPLEG"] = [45 * prep, 0, 5];
+            rotations["LEFT_LEG"] = [85 * prep, 0, 0];
+            rotations["RIGHT_LEG"] = [85 * prep, 0, 0];
+            rotations["LEFT_FOOT"] = [-20 * prep, 0, 0];
+            rotations["RIGHT_FOOT"] = [-20 * prep, 0, 0];
+            
+            // 팔 - 뒤로 젖혀서 추진력 준비
+            rotations["LEFT_SHOULDER"] = [-20 * prep, 0, -10];
+            rotations["RIGHT_SHOULDER"] = [-20 * prep, 0, 10];
+            rotations["LEFT_ARM"] = [15 * prep, 15 * prep, -20];
+            rotations["RIGHT_ARM"] = [15 * prep, -15 * prep, 20];
+            rotations["LEFT_FOREARM"] = [10 * prep, 0, 0];
+            rotations["RIGHT_FOREARM"] = [10 * prep, 0, 0];
+            
+            // 상체 - 약간 앞으로 숙임
+            rotations["SPINE"] = [15 * prep, 0, 0];
+            rotations["SPINE1"] = [10 * prep, 0, 0];
+            
+            translations["HIPS"] = [
+                this.accumulatePosition[0], 
+                -0.1 * prep, 
+                this.accumulatePosition[2]
+            ]; // 살짝 아래로
+            
+        } else if (hipsY > 0.01) {
+            // Phase 2: 공중에서 (이륙 후 ~ 착지 전)
+            const airProgress = Math.min(heightRatio, 1.0);
+            
+            // 다리 - 자연스럽게 약간 구부림
+            rotations["LEFT_UPLEG"] = [15, 0, -3];
+            rotations["RIGHT_UPLEG"] = [15, 0, 3];
+            rotations["LEFT_LEG"] = [25, 0, 0];
+            rotations["RIGHT_LEG"] = [25, 0, 0];
+            rotations["LEFT_FOOT"] = [-10, 0, 0];
+            rotations["RIGHT_FOOT"] = [-10, 0, 0];
+            
+            // 팔 - 위로 올려서 균형 및 우아함
+            const armHeight = 80 * this.easeInOut(airProgress);
+            rotations["LEFT_SHOULDER"] = [30, 0, -15];
+            rotations["RIGHT_SHOULDER"] = [30, 0, 15];
+            rotations["LEFT_ARM"] = [-armHeight, 20, -30];
+            rotations["RIGHT_ARM"] = [-armHeight, -20, 30];
+            rotations["LEFT_FOREARM"] = [-20, 0, 0];
+            rotations["RIGHT_FOREARM"] = [-20, 0, 0];
+            
+            // 손 
+            rotations["LEFT_HAND"] = [-10, 0, -10];
+            rotations["RIGHT_HAND"] = [-10, 0, 10];
+            
+            // 손가락 - 자연스럽게 펼침
+            ["LEFT", "RIGHT"].forEach(side => {
+                rotations[`${side}_THUMB1`] = [0, 0, side === "LEFT" ? -15 : 15];
+                rotations[`${side}_THUMB2`] = [0, 0, 0];
+                
+                ["INDEX", "MIDDLE", "RING", "PINKY"].forEach(finger => {
+                    rotations[`${side}_${finger}1`] = [0, 0, 0];
+                    rotations[`${side}_${finger}2`] = [0, 0, 0];
+                    rotations[`${side}_${finger}3`] = [0, 0, 0];
+                });
+            });
+            
+            // 상체 - 똑바로 세움
+            rotations["SPINE"] = [0, 0, 0];
+            rotations["SPINE1"] = [0, 0, 0];
+            rotations["NECK"] = [0, 0, 0];
+            
+            translations["HIPS"] = [
+                this.accumulatePosition[0], 
+                hipsY, 
+                this.accumulatePosition[2]
+            ];
+            
+        } else {
+            // Phase 3: 착지 및 안정화
+            const landProgress = Math.min((progress - prepPhaseRatio) / (1 - prepPhaseRatio), 1.0);
+            const impact = this.easeOut(landProgress);
+            
+            // 다리 - 착지 충격 흡수
+            rotations["LEFT_UPLEG"] = [30 * (1 - impact), 0, -3 * (1 - impact)];
+            rotations["RIGHT_UPLEG"] = [30 * (1 - impact), 0, 3 * (1 - impact)];
+            rotations["LEFT_LEG"] = [45 * (1 - impact), 0, 0];
+            rotations["RIGHT_LEG"] = [45 * (1 - impact), 0, 0];
+            rotations["LEFT_FOOT"] = [-15 * (1 - impact), 0, 0];
+            rotations["RIGHT_FOOT"] = [-15 * (1 - impact), 0, 0];
+            
+            // 팔 - 균형 잡기 위해 옆으로
+            rotations["LEFT_SHOULDER"] = [30 * (1 - impact) - 10 * impact, 0, -15 - 15 * impact];
+            rotations["RIGHT_SHOULDER"] = [30 * (1 - impact) - 10 * impact, 0, 15 + 15 * impact];
+            rotations["LEFT_ARM"] = [-80 * (1 - impact) + 10 * impact, 20 * (1 - impact), -30 * (1 - impact) - 20 * impact];
+            rotations["RIGHT_ARM"] = [-80 * (1 - impact) + 10 * impact, -20 * (1 - impact), 30 * (1 - impact) + 20 * impact];
+            rotations["LEFT_FOREARM"] = [-20 * (1 - impact) + 30 * impact, 0, 0];
+            rotations["RIGHT_FOREARM"] = [-20 * (1 - impact) + 30 * impact, 0, 0];
+            
+            // 손 - 착지 시 자연스러운 위치
+            rotations["LEFT_HAND"] = [-10 * (1 - impact), 0, -10 * (1 - impact)];
+            rotations["RIGHT_HAND"] = [-10 * (1 - impact), 0, 10 * (1 - impact)];
+            
+            // 손가락 - 약간 긴장된 상태
+            const fingerTension = 5 * impact;
+            ["LEFT", "RIGHT"].forEach(side => {
+                rotations[`${side}_THUMB1`] = [0, 0, (side === "LEFT" ? -15 : 15) * (1 - impact) + fingerTension];
+                rotations[`${side}_THUMB2`] = [fingerTension * 0.8, 0, 0];
+                
+                ["INDEX", "MIDDLE", "RING", "PINKY"].forEach(finger => {
+                    rotations[`${side}_${finger}1`] = [fingerTension * 0.5, 0, 0];
+                    rotations[`${side}_${finger}2`] = [fingerTension * 0.8, 0, 0];
+                    rotations[`${side}_${finger}3`] = [fingerTension * 0.6, 0, 0];
+                });
+            });
+            
+            // 상체 - 착지 충격으로 약간 앞으로
+            rotations["SPINE"] = [10 * (1 - impact), 0, 0];
+            rotations["SPINE1"] = [5 * (1 - impact), 0, 0];
+            rotations["NECK"] = [-5 * (1 - impact), 0, 0];
+            
+            translations["HIPS"] = [
+                this.accumulatePosition[0], 
+                Math.max(0, hipsY), 
+                this.accumulatePosition[2]
+            ];
+        }
+        
+        return { rotations, translations };
+    }
+
+    spaceWalkAnimation(progress) {
+        const rotations = { ...this.baseRotations };
+        const translations = { ...this.baseTranslations };
+
+        // 중력에 따른 실제 점프 높이와 체공 시간 계산
+        const baseJumpHeight = 0.15; // 기본 점프 높이 (지구 기준)
+        const actualJumpHeight = baseJumpHeight * (9.8 / Math.max(this.gravity, 0.01)); // 중력에 반비례
+        const earthInitialVelocity = Math.sqrt(2 * this.gravity * actualJumpHeight);
+        
+        // 현재 중력에서의 체공 시간
+        const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
+
+        // 자연스러운 시작/끝을 위한 개선된 이징
+        let easedProgress = progress;
+        const easeInDuration = 0.15;
+        const easeOutDuration = 0.15;
+        
+        if (progress < easeInDuration) {
+            easedProgress = this.easeOut(progress / easeInDuration) * easeInDuration;
+        } else if (progress > (1 - easeOutDuration)) {
+            const endPhase = (progress - (1 - easeOutDuration)) / easeOutDuration;
+            easedProgress = (1 - easeOutDuration) + this.easeIn(endPhase) * easeOutDuration;
+        }
+
+        // 우주에서의 느린 보행 주기 - 중력에 따라 조정
+        const baseStepFrequency = 1.25; // 기본 걸음 주파수 (걸음/초)
+        const gravityFactor = Math.max(this.gravity, 0.01) / 9.8;
+        const stepFrequency = baseStepFrequency * Math.sqrt(gravityFactor);
+        
+        // 전체 애니메이션에서의 걸음 수 계산
+        const animationTimeSeconds = this.animationDuration / 1000;
+        const totalStepsInAnimation = stepFrequency * animationTimeSeconds;
+        const currentStepCount = easedProgress * totalStepsInAnimation;
+        const currentStepPhase = (currentStepCount % 1.0);
+        
+        // 걸음 단계 정의
+        const isLeftStep = Math.floor(currentStepCount) % 2 === 0;
+        const stepPhase = currentStepPhase;
+        
+        // 동작 강도 조절 - 더 부드러운 시작/끝
+        let intensityMultiplier = 1.0;
+        if (progress < easeInDuration) {
+            intensityMultiplier = this.easeOut(progress / easeInDuration);
+        } else if (progress > (1 - easeOutDuration)) {
+            const endPhase = (progress - (1 - easeOutDuration)) / easeOutDuration;
+            intensityMultiplier = 1.0 - this.easeIn(endPhase);
+        }
+        
+        // 중력 기반 물리적 수직 움직임 계산
+        const currentTime = (currentStepPhase * totalFlightTime);
+        let physicalHeight = Math.max(0, earthInitialVelocity * currentTime - 0.5 * this.gravity * currentTime * currentTime);
+        
+        // 기본 부유 높이는 중력에 따라 조정
+        const baseFloat = 0.03 + (0.02 * (9.8 / Math.max(this.gravity, 0.01))); // 중력이 낮을수록 더 높게 부유
+        const jumpContribution = (physicalHeight / actualJumpHeight) * (0.02 + 0.03 * (9.8 / Math.max(this.gravity, 0.01)));
+        const bobHeight = baseFloat + jumpContribution * intensityMultiplier;
+        
+        // 미세한 좌우 균형 움직임 - 중력에 따라 조정
+        const balanceIntensity = Math.sqrt(9.8 / Math.max(this.gravity, 0.01));
+        const balanceX = 0.012 * Math.sin(currentStepCount * Math.PI * 0.7) * intensityMultiplier * balanceIntensity;
+        const balanceZ = 0.008 * Math.cos(currentStepCount * Math.PI * 0.9) * intensityMultiplier * balanceIntensity;
+        
+        // 자연스러운 다리 움직임 - 중력에 따라 조정 
+        const legLiftHeight = 1 * intensityMultiplier * balanceIntensity; // 5에서 12로 증가
+        const legSwingRange = 30 * intensityMultiplier * balanceIntensity; // 15에서 20으로 증가
+        const hipSway = 1.5 * intensityMultiplier * balanceIntensity; // 1에서 1.5로 증가
+        
+        // 착지 감지 및 자연스러운 다리 자세 조정
+        const isNearLanding = physicalHeight < (actualJumpHeight * 0.2) && currentStepPhase > 0.6;
+        const landingFactor = isNearLanding ? (1 - (physicalHeight / (actualJumpHeight * 0.2))) : 0;
+        
+        // 걸음 패턴 계산
+        const liftCurve = Math.sin(stepPhase * Math.PI);
+        const swingCurve = Math.sin(stepPhase * Math.PI * 2) * 0.5;
+        
+        if (isLeftStep) {
+            // 왼발이 움직이는 단계
+            const leftLegLift = liftCurve * legLiftHeight * 0.4 + hipSway; // 0.25에서 0.4로 증가
+            const leftKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 25 - (landingFactor * 10)); 
+            const leftAnkleFlexion = -liftCurve * legLiftHeight * 1.2 + (landingFactor * 5); 
+            
+            rotations["LEFT_UPLEG"] = [
+                swingCurve * legSwingRange * 0.8 - (landingFactor * 8),
+                0, 
+                leftLegLift - (landingFactor * 3)
+            ];
+            rotations["LEFT_LEG"] = [leftKneeFlexion, 0, 0];
+            rotations["LEFT_FOOT"] = [
+                leftAnkleFlexion,
+                0, 
+                liftCurve * 3 - (landingFactor * 1) // 2에서 3으로 증가
+            ];
+            
+            // 오른발 - 지지하는 발
+            rotations["RIGHT_UPLEG"] = [
+                -swingCurve * legSwingRange * 0.3 + (landingFactor * 3),
+                0, 
+                -hipSway * 0.4
+            ];
+            rotations["RIGHT_LEG"] = [3 * intensityMultiplier + (landingFactor * 5), 0, 0];
+            rotations["RIGHT_FOOT"] = [2 * intensityMultiplier + (landingFactor * 3), 0, 0];
+            
+        } else {
+            // 오른발이 움직이는 단계
+            const rightLegLift = -liftCurve * legLiftHeight * 0.4 - hipSway; // 0.25에서 0.4로 증가
+            const rightKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 25 - (landingFactor * 10)); // 0.6에서 0.8로 증가
+            const rightAnkleFlexion = -liftCurve * legLiftHeight * 1.2 + (landingFactor * 5); // 0.3에서 0.4로 증가
+            
+            rotations["RIGHT_UPLEG"] = [
+                swingCurve * legSwingRange * 0.8 - (landingFactor * 8),
+                0, 
+                rightLegLift + (landingFactor * 3)
+            ];
+            rotations["RIGHT_LEG"] = [rightKneeFlexion, 0, 0];
+            rotations["RIGHT_FOOT"] = [
+                rightAnkleFlexion,
+                0, 
+                -liftCurve * 3 + (landingFactor * 1) // 2에서 3으로 증가
+            ];
+            
+            // 왼발 - 지지하는 발
+            rotations["LEFT_UPLEG"] = [
+                -swingCurve * legSwingRange * 0.3 + (landingFactor * 3),
+                0, 
+                hipSway * 0.4
+            ];
+            rotations["LEFT_LEG"] = [3 * intensityMultiplier + (landingFactor * 5), 0, 0];
+            rotations["LEFT_FOOT"] = [2 * intensityMultiplier + (landingFactor * 3), 0, 0];
+        }
+        
+        // 자연스러운 팔 움직임 - 다리와 반대로 움직임, 중력에 따라 조정
+        const armSwingRange = 12 * intensityMultiplier * balanceIntensity;
+        const armBalance = 6 * intensityMultiplier * balanceIntensity;
+        const shoulderFloat = 3 * intensityMultiplier * balanceIntensity;
+        
+        const armPhase = Math.sin((stepPhase + (isLeftStep ? 0.5 : 0)) * Math.PI);
+        
+        if (isLeftStep) {
+            // 오른팔 (활발한 움직임)
+            rotations["RIGHT_SHOULDER"] = [
+                armPhase * armSwingRange * 0.3,
+                armPhase * armSwingRange * 0.15,
+                shoulderFloat
+            ];
+            rotations["RIGHT_ARM"] = [
+                armPhase * armSwingRange * 0.8,
+                armPhase * armSwingRange * 0.25,
+                10 * intensityMultiplier
+            ];
+            rotations["RIGHT_FOREARM"] = [
+                Math.max(0, armPhase * armSwingRange * 0.4),
+                0,
+                shoulderFloat
+            ];
+            
+            // 왼팔 (균형 움직임)
+            rotations["LEFT_SHOULDER"] = [
+                -armPhase * armBalance * 0.25,
+                -armPhase * armBalance * 0.15,
+                -shoulderFloat * 0.5
+            ];
+            rotations["LEFT_ARM"] = [
+                -armPhase * armBalance * 0.8,
+                -armPhase * armBalance * 0.2,
+                -8 * intensityMultiplier
+            ];
+            rotations["LEFT_FOREARM"] = [
+                Math.max(0, armPhase * armBalance * 0.3),
+                0,
+                -shoulderFloat * 0.3
+            ];
+            
+        } else {
+            // 왼팔 (활발한 움직임)
+            rotations["LEFT_SHOULDER"] = [
+                armPhase * armSwingRange * 0.3,
+                -armPhase * armSwingRange * 0.15,
+                -shoulderFloat
+            ];
+            rotations["LEFT_ARM"] = [
+                armPhase * armSwingRange * 0.8,
+                -armPhase * armSwingRange * 0.25,
+                -10 * intensityMultiplier
+            ];
+            rotations["LEFT_FOREARM"] = [
+                Math.max(0, armPhase * armSwingRange * 0.4),
+                0,
+                -shoulderFloat
+            ];
+            
+            // 오른팔 (균형 움직임)
+            rotations["RIGHT_SHOULDER"] = [
+                -armPhase * armBalance * 0.25,
+                armPhase * armBalance * 0.15,
+                shoulderFloat * 0.5
+            ];
+            rotations["RIGHT_ARM"] = [
+                -armPhase * armBalance * 0.8,
+                armPhase * armBalance * 0.2,
+                8 * intensityMultiplier
+            ];
+            rotations["RIGHT_FOREARM"] = [
+                Math.max(0, armPhase * armBalance * 0.3),
+                0,
+                shoulderFloat * 0.3
+            ];
+        }
+        
+        // 자연스러운 손 자세 - 편안하게 반쯤 구부린 상태
+        const fingerRelax = 6;
+        const thumbSpread = 3;
+        ["LEFT", "RIGHT"].forEach(side => {
+            rotations[`${side}_HAND`] = [0, 0, 0];
+            rotations[`${side}_THUMB1`] = [thumbSpread, 0, side === "LEFT" ? fingerRelax : -fingerRelax];
+            rotations[`${side}_THUMB2`] = [fingerRelax * 0.5, 0, 0];
+            
+            ["INDEX", "MIDDLE", "RING", "PINKY"].forEach((finger, idx) => {
+                const spread = thumbSpread * 0.2 * (idx + 1);
+                rotations[`${side}_${finger}1`] = [fingerRelax * 0.3, 0, side === "LEFT" ? -spread : spread];
+                rotations[`${side}_${finger}2`] = [fingerRelax * 0.5, 0, 0];
+                rotations[`${side}_${finger}3`] = [fingerRelax * 0.3, 0, 0];
+            });
+        });
+        
+        // 상체의 자연스러운 균형 움직임 - 중력에 따라 조정
+        const spineBalance = Math.sin(currentStepCount * Math.PI * 0.5) * 1.5 * intensityMultiplier * balanceIntensity;
+        const headCounter = Math.cos(currentStepCount * Math.PI * 0.3) * 1 * intensityMultiplier * balanceIntensity;
+        
+        rotations["SPINE"] = [spineBalance, balanceX * 2, balanceZ * 1.5];
+        rotations["SPINE1"] = [spineBalance * 0.6, balanceX * 1.5, -balanceZ * 0.8];
+        rotations["NECK"] = [-spineBalance * 0.3, -balanceX * 0.8, headCounter];
+        rotations["HEAD"] = [headCounter * 0.2, headCounter * 0.3, -headCounter * 0.15];
+        
+        // 중력에 따른 이동 속도 조정
+        const stepDistance = this.walkSpeed * 0.012 * Math.sqrt(gravityFactor);
+        const totalDistance = currentStepCount * stepDistance;
+        
+        const currentX = totalDistance * this.walkingDirection[0];
+        const currentZ = totalDistance * this.walkingDirection[2];
+        
+        translations["HIPS"] = [
+            this.accumulatePosition[0] + currentX + balanceX,
+            bobHeight,
+            this.accumulatePosition[2] + currentZ + balanceZ
+        ];
+        
         return { rotations, translations };
     }
 
@@ -698,25 +1327,34 @@ function updateAnimations(deltaTime, rootNode) {
 }
 
 const GRAVITY_PRESETS = {
-    EARTH: 9.8,
+    MERCURY: 3.70,
+    VENUS: 8.87,
+    EARTH: 9.81,
     MOON: 1.6,
-    MARS: 3.7,
-    JUPITER: 24.8,
-    TITAN: 1.4,
-    EUROPA: 1.3,
-    CERES: 0.27,
-    ZERO_G: 0.0,
-    MICRO_G: 0.01
+    MARS: 3.71,
+    JUPITER: 24.79,
+    SATURN: 10.44,
+    URANUS: 8.69,
+    NEPTUNE: 11.15
 };
 
 const ANIMATION_TYPES = {
+    GREETING: 'greeting',
+    WALK: 'walk',
+    JUMP: 'jump',
+    SPACE_WALK: 'spaceWalk',
     FRONT_FLIP: 'frontFlip',
-    BACK_FLIP: 'backFlip',
-    GREETING: 'greeting'
+    BACK_FLIP: 'backFlip'
 };
 
 function setSpaceEnvironment(environment) {
     switch(environment.toLowerCase()) {
+	case 'mercury':
+	    setGravity(GRAVITY_PRESETS.MERCURY);
+	    break;
+	case 'venus':
+	    setGravity(GRAVITY_PRESETS.VENUS);
+	    break;
         case 'earth':
             setGravity(GRAVITY_PRESETS.EARTH);
             break;
@@ -729,6 +1367,15 @@ function setSpaceEnvironment(environment) {
         case 'jupiter':
             setGravity(GRAVITY_PRESETS.JUPITER);
             break;
+	case 'saturn':
+	    setGravity(GRAVITY_PRESETS.SATURN);
+	    break;
+	case 'uranus':
+	    setGravity(GRAVITY_PRESETS.URANUS);
+	    break;
+	case 'nepture':
+	    setGravity(GRAVITY_PRESETS.NEPTUNE);
+	    break;
         case 'space':
         case 'zerog':
             setGravity(GRAVITY_PRESETS.ZERO_G);
@@ -739,6 +1386,16 @@ function setSpaceEnvironment(environment) {
         default:
             setGravity(GRAVITY_PRESETS.EARTH);
     }
+    const buttons = document.querySelectorAll('#planets button');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase() === environment.toLowerCase()) {
+            btn.classList.add('active');
+        }
+    });
 }
 
 window.animationSystem = animationSystem;
+window.playAnimation = playAnimation;
+window.setGravity = setGravity;
+window.setSpaceEnvironment = setSpaceEnvironment;

@@ -62,7 +62,45 @@
         <script src="./src/animation.js"></script>
         <script src="./src/main.js"></script>
     </head>
+
+<style>
+#planets button {
+    padding: 8px 12px;
+    margin: 4px;
+    border: 1px solid #888;
+    background-color: #f0f0f0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+#planets button.active {
+    background-color: #4a90e2;
+    color: white;
+    border-color: #2c6fc2;
+}
+</style>
+
+
     <body>
         <canvas id="glCanvas" width="500" height="500"></canvas>
+
+	<div id="controls">	
+	<button onclick="playAnimation('greeting')">Greeting</button>
+	<button onclick="playAnimation('frontFlip')">Front Flip</button>
+	<button onclick="playAnimation('backFlip')">Back Flip</button>
+	</div>
+	
+	<div id="planets">
+	<button onclick="setSpaceEnvironment('mercury')">Mercury</button>
+	<button onclick="setSpaceEnvironment('venus')">Venus</button>
+	<button onclick="setSpaceEnvironment('earth')" class="active">Earth</button>
+	<button onclick="setSpaceEnvironment('moon')">Moon</button>
+	<button onclick="setSpaceEnvironment('mars')">Mars</button>
+	<button onclick="setSpaceEnvironment('jupiter')">Jupiter</button>
+	<button onclick="setSpaceEnvironment('saturn')">Saturn</button>
+	<button onclick="setSpaceEnvironment('uranus')">Uranus</button>
+	<button onclick="setSpaceEnvironment('neptune')">Neptune</button>
+	</div>
     </body>
 </html>

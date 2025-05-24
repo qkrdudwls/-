@@ -20,6 +20,7 @@ let sphereData, cylinderData;
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
 
 let lastTime = 0;
+let currentEnvironment = 'earth';
 
 function createNode(name, translation, render, sibling = null, child = null) {
     let node = {
@@ -101,12 +102,12 @@ function traverse(root) {
         node.transform = mult(t, mult(rz, mult(ry, rx)));
         node.worldMatrix = mult(parentMatrix, node.transform);
 
-        renderJoint(node.worldMatrix);
+        renderJoint(node.worldMatrix, node.name);
 
         if (parentNode) {
             const fromVec = mult(parentMatrix, vec4(0, 0, 0, 1));
             const toVec = mult(node.worldMatrix, vec4(0, 0, 0, 1));
-            renderBone(fromVec, toVec);
+            renderBone(fromVec, toVec, parentNode.name, node.name);
         }
 
         if (node.sibling) {
@@ -126,6 +127,22 @@ function traverse(root) {
         }
     }
 }
+
+function changeEnvironment(environment) {
+    currentEnvironment = environment;
+    setSpaceEnvironment(currentEnvironment);
+}
+
+function setMercury() { changeEnvironment('mercury'); }
+function setVenus() { changeEnvironment('venus'); }
+function setEarth() { changeEnvironment('earth'); }
+function setMoon() { changeEnvironment('moon'); }
+function setMars() { changeEnvironment('mars'); }
+function setJupiter() { changeEnvironment('jupiter'); }
+function setSaturn() { changeEnvironment('saturn'); }
+function setUranus() { changeEnvironment('uranus'); }
+function setNeptune() { changeEnvironment('neptune'); }
+
 
 window.onload = function init() {
     const canvas = document.getElementById("glCanvas");
@@ -153,8 +170,8 @@ window.onload = function init() {
     gl.uniform3fv(uAmbientLight, flatten(vec3(0.2, 0.2, 0.2)));
     gl.uniform1f(uDiffuseStrength, 0.8);
 
-    sphereData = createSphere(0.025, 12, 12);
-    cylinderData = createCylinder(0.02, 0.02, 1.0, 8, 1);
+    sphereData = createSphere(0.05, 12, 12);
+    cylinderData = createClosedCylinder(0.05, 0.05, 1.0, 8, 1);
 
     sphereBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, sphereBuffer);
@@ -185,19 +202,27 @@ window.onload = function init() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    animationSystem.startAnimation("greeting", 2000, true);
+    //animationSystem.startAnimation("greeting", 2000, true);
     //animationSystem.startAnimation("frontFlip", null, false);
+
+    setMars();
+    animationSystem.startAnimation("spaceWalk", null, false);
 
     render();
 }
 
-function renderJoint(worldMatrix) {
+function renderJoint(worldMatrix, jointName) {
     gl.useProgram(program);
 
+    let scale = 1.0;
+
+    if (jointName === "HEAD" || jointName.includes("LEG")) {
+        scale = 2.0;
+    }
+
     const mvMatrix = mult(modelViewMatrix, worldMatrix);
-    const scale = 1.0;
     const scaledMvMatrix = mult(mvMatrix, scalem(scale, scale, scale));
-    
+
     gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(scaledMvMatrix));
     gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
 
@@ -218,31 +243,57 @@ function renderJoint(worldMatrix) {
     gl.drawElements(gl.TRIANGLES, sphereData.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
-function renderBone(from, to) {
+function renderBone(from, to, parentName, childName) {
     gl.useProgram(program);
+
+    const isSpine = parentName === "SPINE" || parentName === "SPINE1" || childName === "SPINE";
+    const isLeg = parentName.includes("LEG") || parentName.includes("UPLEG") || childName === "NECK" || parentName === "NECK" || childName.includes("UPLEG");
+
+    let radius = 0.05;
+
+    if (isSpine) {
+        radius = 0.2;
+    }
+    else if (isLeg) {
+	radius = 0.1;
+    }
+
+    const customCylinder = createClosedCylinder(radius, radius, 1.0, 12, 1);
+
+    const vertexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(customCylinder.vertices), gl.STATIC_DRAW);
+
+    const normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(customCylinder.normals), gl.STATIC_DRAW);
+
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(customCylinder.indices), gl.STATIC_DRAW);
 
     const cylinderMatrix = calculateCylinderMatrix(from, to);
     const mvMatrix = mult(modelViewMatrix, cylinderMatrix);
 
     gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(mvMatrix));
     gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
-
     const normalMatrix = transpose(inverse4(mvMatrix));
     gl.uniformMatrix4fv(uNormalMatrix, false, flatten(normalMatrix));
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, cylinderBuffer);
     const vPosition = gl.getAttribLocation(program, "vPosition");
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vPosition);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, cylinderNormalBuffer);
     const vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cylinderIndexBuffer);
-    gl.drawElements(gl.TRIANGLES, cylinderData.indices.length, gl.UNSIGNED_SHORT, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.drawElements(gl.TRIANGLES, customCylinder.indices.length, gl.UNSIGNED_SHORT, 0);
 }
+
 
 function render(time = 0) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -250,10 +301,8 @@ function render(time = 0) {
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    if (animationSystem && animationSystem.isPlaying) {
-        const result = animationSystem.updateAnimation(deltaTime);
-        if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
-    }
+    const result = animationSystem.updateAnimation(deltaTime);
+    if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
 
     traverse(root);
 
