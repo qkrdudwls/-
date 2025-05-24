@@ -18,7 +18,7 @@ class AnimationSystem {
         this.initialHipsHeight = 0.0;
 
         this.accumulatePosition = vec3(0, 0, 0);
-        this.walkingDirection = vec3(1, 0, 0);
+        this.walkingDirection = vec3(0, 0, 1);
         this.walkSpeed = 1.0;
         this.runSpeed = 2.0;
     }
@@ -131,8 +131,7 @@ class AnimationSystem {
             const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
             this.animationDuration = totalFlightTime * 1000;
         } else if (animationType === 'jump') {
-            // jumpAnimation과 동일한 물리 계산 사용
-            const earthJumpHeight = 0.8; // jumpAnimation과 동일한 0.8m 점프
+            const earthJumpHeight = 0.8; 
             const earthInitialVelocity = Math.sqrt(2 * 9.8 * earthJumpHeight);
             const totalFlightTime = (2 * earthInitialVelocity) / Math.max(this.gravity, 0.01);
             this.animationDuration = totalFlightTime * 1000;
@@ -141,19 +140,16 @@ class AnimationSystem {
         } else if (animationType === 'run') {
             this.animationDuration = duration || 2000;
         } else if (animationType === 'spaceWalk') {
-            // 물리 기반 걸음 주기로 자동 계산
-            const earthStepDuration = 0.8; // 지구에서의 한 걸음 시간 (초)
+            const earthStepDuration = 0.8; 
             const gravityFactor = Math.max(this.gravity, 0.01) / 9.8;
             const spaceStepDuration = earthStepDuration / Math.sqrt(gravityFactor);
-            const stepsPerAnimation = 4; // 애니메이션당 걸음 수
+            const stepsPerAnimation = 4;
             this.animationDuration = spaceStepDuration * stepsPerAnimation * 1000;
         } else {
             this.animationDuration = duration || 2000;
         }
-        
-        // 걷기와 뛰기 애니메이션의 경우 연속적인 움직임을 위한 초기화
+
         if (animationType === 'walk' || animationType === 'run' || animationType === 'spaceWalk' || animationType === 'spaceRun') {
-            // 현재 위치를 기준으로 누적 위치 초기화
             if (!this.accumulatePosition) {
                 this.accumulatePosition = [0, 0, 0];
             }

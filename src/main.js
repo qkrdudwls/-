@@ -202,8 +202,7 @@ window.onload = function init() {
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
     setMars();
-    animationSystem.setWalkingDirection(0, 0, 1);
-    animationSystem.startAnimation("jump", null, false);
+    animationSystem.startAnimation("spaceWalk", null, false);
 
     render();
 }
