@@ -133,11 +133,15 @@ function changeEnvironment(environment) {
     setSpaceEnvironment(currentEnvironment);
 }
 
+function setMercury() { changeEnvironment('mercury'); }
+function setVenus() { changeEnvironment('venus'); }
 function setEarth() { changeEnvironment('earth'); }
 function setMoon() { changeEnvironment('moon'); }
 function setMars() { changeEnvironment('mars'); }
 function setJupiter() { changeEnvironment('jupiter'); }
-function setAsteroid() { changeEnvironment('asteroid'); }
+function setSaturn() { changeEnvironment('saturn'); }
+function setUranus() { changeEnvironment('uranus'); }
+function setNeptune() { changeEnvironment('neptune'); }
 
 window.onload = function init() {
     const canvas = document.getElementById("glCanvas");
@@ -197,8 +201,9 @@ window.onload = function init() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    setEarth();
-    animationSystem.startAnimation("frontFlip", null, false);
+    setMoon();
+    animationSystem.setWalkingDirection(0, 0, 1);
+    animationSystem.startAnimation("jump", null, false);
 
     render();
 }
