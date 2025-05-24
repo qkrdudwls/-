@@ -20,6 +20,7 @@ let sphereData, cylinderData;
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
 
 let lastTime = 0;
+let currentEnvironment = 'earth';
 
 function createNode(name, translation, render, sibling = null, child = null) {
     let node = {
@@ -127,6 +128,17 @@ function traverse(root) {
     }
 }
 
+function changeEnvironment(environment) {
+    currentEnvironment = environment;
+    setSpaceEnvironment(currentEnvironment);
+}
+
+function setEarth() { changeEnvironment('earth'); }
+function setMoon() { changeEnvironment('moon'); }
+function setMars() { changeEnvironment('mars'); }
+function setJupiter() { changeEnvironment('jupiter'); }
+function setAsteroid() { changeEnvironment('asteroid'); }
+
 window.onload = function init() {
     const canvas = document.getElementById("glCanvas");
     gl = WebGLUtils.setupWebGL(canvas);
@@ -185,8 +197,8 @@ window.onload = function init() {
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    animationSystem.startAnimation("greeting", 2000, true);
-    //animationSystem.startAnimation("frontFlip", null, false);
+    setEarth();
+    animationSystem.startAnimation("frontFlip", null, false);
 
     render();
 }
