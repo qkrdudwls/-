@@ -1376,13 +1376,6 @@ function setSpaceEnvironment(environment) {
 	case 'nepture':
 	    setGravity(GRAVITY_PRESETS.NEPTUNE);
 	    break;
-        case 'space':
-        case 'zerog':
-            setGravity(GRAVITY_PRESETS.ZERO_G);
-            break;
-        case 'asteroid':
-            setGravity(GRAVITY_PRESETS.CERES);
-            break;
         default:
             setGravity(GRAVITY_PRESETS.EARTH);
     }
