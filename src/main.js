@@ -205,8 +205,8 @@ window.onload = function init() {
     //animationSystem.startAnimation("greeting", 2000, true);
     //animationSystem.startAnimation("frontFlip", null, false);
 
-    setMars();
-    animationSystem.startAnimation("spaceWalk", null, false);
+    setEarth();
+    animationSystem.startAnimation("frontFlip", null, false);
 
     render();
 }

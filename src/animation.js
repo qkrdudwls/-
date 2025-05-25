@@ -939,6 +939,86 @@ class AnimationSystem {
         return { rotations, translations };
     }
 
+    // 추진력을 얻는 애니메이션
+    preparationAnimation(progress) {
+        const rotations = { ...this.baseRotations };
+        const translations = { ...this.baseTranslations };
+        
+        const phase1EndProgress = 0.5; // 전체 준비 단계의 50%까지가 crouch
+        const phase2EndProgress = 1.0; // 나머지 50%가 push
+        
+        if (progress <= phase1EndProgress) {
+            // Phase 1a: 순수한 준비 단계 - 다리 굽히기만
+            const crouchT = progress / phase1EndProgress;
+            const crouch = this.easeInOut(crouchT);
+            
+            // HIPS 위치 조정 - 발과 정강이는 고정, HIPS만 아래로 이동
+            const crouchDepth = 0.45;
+            translations["HIPS"][1] = -(crouchDepth * crouch);
+            
+            // 다리 - 굽히기
+            rotations["LEFT_UPLEG"] = [-(5 * crouch), 0, -3];
+            rotations["RIGHT_UPLEG"] = [-(5 * crouch), 0, 3];
+            rotations["LEFT_LEG"] = [(5 * crouch), 0, 0];
+            rotations["RIGHT_LEG"] = [(5 * crouch), 0, 0];
+            
+            // 척추 - 자연스럽게 아주 조금만 굽히기
+            const naturalSpineBend = 5;
+            rotations["SPINE"] = [naturalSpineBend * crouch, 0, 0];
+            rotations["SPINE1"] = [(naturalSpineBend * 0.3) * crouch, 0, 0];
+            rotations["NECK"] = [0, 0, 0];
+            
+            // 어깨와 팔 - 자연스러운 점프 자세
+            rotations["LEFT_SHOULDER"] = [0, 0, 0];
+            rotations["RIGHT_SHOULDER"] = [0, 0, 0];
+            rotations["LEFT_ARM"] = [0, 0, 0];
+            rotations["RIGHT_ARM"] = [0, 0, 0];
+            rotations["LEFT_FOREARM"] = [0, 0, 0];
+            rotations["RIGHT_FOREARM"] = [0, 0, 0];
+            rotations["LEFT_HAND"] = [0, 0, 0];
+            rotations["RIGHT_HAND"] = [0, 0, 0];
+            
+        } else {
+            // Phase 1b: 추진 단계 - 다리 펴기 시작하면서 회전도 시작
+            const pushT = (progress - phase1EndProgress) / (phase2EndProgress - phase1EndProgress);
+            const push = this.easeOut(pushT); // 추진력으로 펴지는 동작
+            
+            // 최대 crouch 상태에서 시작해서 점진적으로 펴기
+            const crouchDepth = 0.2;
+            const maxCrouch = 1.0; // 최대 굽힘 상태
+            const currentCrouch = maxCrouch * (1 - push * 0.7); // 70%까지만 펴기 (완전히 펴지지 않음)
+            
+            translations["HIPS"][1] = -(crouchDepth * currentCrouch);
+            
+            // 다리 - 추진을 위해 펴기 시작
+            const maxUplegBend = 30;
+            const maxLegBend = 30;
+            
+            rotations["LEFT_UPLEG"] = [-(10 + maxUplegBend * currentCrouch), 0, -3];
+            rotations["RIGHT_UPLEG"] = [-(10 + maxUplegBend * currentCrouch), 0, 3];
+            rotations["LEFT_LEG"] = [5 + (maxLegBend * currentCrouch), 0, 0];
+            rotations["RIGHT_LEG"] = [5 + (maxLegBend * currentCrouch), 0, 0];
+            
+            // 척추도 추진을 위해 조금 더 굽히기
+            rotations["SPINE"] = [5 + (15 * push), 0, 0];
+            rotations["SPINE1"] = [1.5 + (10 * push), 0, 0];
+            rotations["NECK"] = [5 * push, 0, 0];
+            
+            // 팔 준비 - 점프를 위해 살짝 올리기 시작
+            rotations["LEFT_SHOULDER"] = [-5 * push, 0, -10 * push];
+            rotations["RIGHT_SHOULDER"] = [-5 * push, 0, 10 * push];
+            
+            rotations["LEFT_ARM"] = [0, 0, 0];
+            rotations["RIGHT_ARM"] = [0, 0, 0];
+            rotations["LEFT_FOREARM"] = [0, 0, 0];
+            rotations["RIGHT_FOREARM"] = [0, 0, 0];
+            rotations["LEFT_HAND"] = [0, 0, 0];
+            rotations["RIGHT_HAND"] = [0, 0, 0];
+        }
+        
+        return { rotations, translations };
+    }
+
     frontFlipAnimation(progress) {
         const rotations = { ...this.baseRotations };
         const translations = { ...this.baseTranslations };
@@ -958,6 +1038,7 @@ class AnimationSystem {
 
         let globalRotationX = 0;
         
+        // 공중에서만 회전 시작
         if (hipsY > 0.01) {
             const airborneStart = earthInitialVelocity / Math.max(this.gravity, 0.01) - Math.sqrt((earthInitialVelocity * earthInitialVelocity) - (2 * this.gravity * 0.01)) / Math.max(this.gravity, 0.01);
             const airborneEnd = earthInitialVelocity / Math.max(this.gravity, 0.01) + Math.sqrt((earthInitialVelocity * earthInitialVelocity) - (2 * this.gravity * 0.01)) / Math.max(this.gravity, 0.01);
@@ -970,138 +1051,124 @@ class AnimationSystem {
             }
         }
         
-        let tuckFactor = 0;
-        
         const heightRatio = hipsY / currentJumpHeight;
         const rotationRatio = globalRotationX / 360;
         
-        if (heightRatio < 0.15 && rotationRatio < 0.1) {
-            // Phase 1: 준비 및 이륙
-            const phaseT = Math.min(heightRatio / 0.15, rotationRatio / 0.1);
-            const prep = this.easeOut(phaseT);
+        // Phase 1: 지상에서 preparationAnimation 적용
+        if (hipsY <= 0.01) {
+            // 지상에서는 preparationAnimation의 마지막 상태 적용
+            const prepResult = this.preparationAnimation(1.0);
+            Object.assign(rotations, prepResult.rotations);
+            Object.assign(translations, prepResult.translations);
             
-            // 다리
-            rotations["LEFT_UPLEG"] = [30 * prep, 0, -3];
-            rotations["RIGHT_UPLEG"] = [30 * prep, 0, 3];
-            rotations["LEFT_LEG"] = [45 * prep, 0, 0];
-            rotations["RIGHT_LEG"] = [45 * prep, 0, 0];
+            // 지상에서는 회전 없음
+            rotations["HIPS"][0] = 0;
+            translations["HIPS"] = [0, prepResult.translations["HIPS"][1], 0];
             
-            // 어깨 - 약간 위로 올려서 준비 자세
-            rotations["LEFT_SHOULDER"] = [10 * prep, 0, -5 * prep];
-            rotations["RIGHT_SHOULDER"] = [10 * prep, 0, 5 * prep];
+        } else if (rotationRatio > 0.01 && rotationRatio < 0.85) {
+            // Phase 2: 공중에서 회전 - 어깨로 팔을 완전히 펼친 상태 유지
+            const phaseT = (rotationRatio - 0.05) / 0.8;
+            const tuckFactor = Math.sin(phaseT * Math.PI * 0.6) * Math.min(phaseT * 2, 1);
+
+            // Phase 1에서 2로의 자연스러운 전환을 위한 보간
+            const transitionSmooth = this.easeInOut(Math.min((rotationRatio - 0.05) / 0.15, 1));
             
-            // 팔 - 자연스러운 준비 동작
-            rotations["LEFT_ARM"] = [-15 * prep, 15 * prep, -10];
-            rotations["RIGHT_ARM"] = [-15 * prep, -15 * prep, 10];
-            rotations["LEFT_FOREARM"] = [20 * prep, 0, 0];
-            rotations["RIGHT_FOREARM"] = [20 * prep, 0, 0];
+            // 다리 - 가슴 쪽으로 당기기
+            rotations["LEFT_UPLEG"] = [-(30 + (110 * tuckFactor)), 0, -5];
+            rotations["RIGHT_UPLEG"] = [-(30 + (110 * tuckFactor)), 0, 5];
+            rotations["LEFT_LEG"] = [45 + (120 * tuckFactor), 0, 0];
+            rotations["RIGHT_LEG"] = [45 + (120 * tuckFactor), 0, 0];
             
-            // 손 - 약간 구부려서 준비
-            rotations["LEFT_HAND"] = [10 * prep, 0, -5 * prep];
-            rotations["RIGHT_HAND"] = [10 * prep, 0, 5 * prep];
+            // 어깨 - 양옆으로 완전히 펼친 상태로 부드럽게 전환
+            const shoulderAngle = -60 + (-30 * transitionSmooth);
+            rotations["LEFT_SHOULDER"] = [-15, 0, shoulderAngle];
+            rotations["RIGHT_SHOULDER"] = [-15, 0, -shoulderAngle];
             
-        } else if (rotationRatio > 0.1 && rotationRatio < 0.85) {
-            // Phase 2: 공중에서 턱 자세
-            const phaseT = (rotationRatio - 0.1) / 0.75;
-            tuckFactor = Math.sin(phaseT * Math.PI * 0.8);
+            // 팔 - 쭉 편 상태 유지
+            rotations["LEFT_ARM"] = [0, 0, 0];
+            rotations["RIGHT_ARM"] = [0, 0, 0];
+            rotations["LEFT_FOREARM"] = [0, 0, 0];
+            rotations["RIGHT_FOREARM"] = [0, 0, 0];
             
-            // 다리
-            rotations["LEFT_UPLEG"] = [30 + (90 * tuckFactor), 0, -5];
-            rotations["RIGHT_UPLEG"] = [30 + (90 * tuckFactor), 0, 5];
-            rotations["LEFT_LEG"] = [45 + (115 * tuckFactor), 0, 0];
-            rotations["RIGHT_LEG"] = [45 + (115 * tuckFactor), 0, 0];
+            // 손 - 자연스럽게 펴진 상태
+            rotations["LEFT_HAND"] = [0, 0, 0];
+            rotations["RIGHT_HAND"] = [0, 0, 0];
             
-            // 어깨 - 턱 자세에서 앞으로 감싸는 동작
-            rotations["LEFT_SHOULDER"] = [10 + (40 * tuckFactor), -10 * tuckFactor, -5 - (10 * tuckFactor)];
-            rotations["RIGHT_SHOULDER"] = [10 + (40 * tuckFactor), 10 * tuckFactor, 5 + (10 * tuckFactor)];
-            
-            // 팔 - 무릎을 감싸는 동작
-            rotations["LEFT_ARM"] = [-15 + (115 * tuckFactor), 15 - (25 * tuckFactor), -10 + (50 * tuckFactor)];
-            rotations["RIGHT_ARM"] = [-15 + (115 * tuckFactor), -15 + (25 * tuckFactor), 10 - (50 * tuckFactor)];
-            rotations["LEFT_FOREARM"] = [20 + (70 * tuckFactor), -15 * tuckFactor, 0];
-            rotations["RIGHT_FOREARM"] = [20 + (70 * tuckFactor), 15 * tuckFactor, 0];
-            
-            // 손 - 무릎을 잡는 자세
-            rotations["LEFT_HAND"] = [10 + (30 * tuckFactor), -10 * tuckFactor, -5 - (15 * tuckFactor)];
-            rotations["RIGHT_HAND"] = [10 + (30 * tuckFactor), 10 * tuckFactor, 5 + (15 * tuckFactor)];
-            
-            // 손가락 - 움켜쥐는 동작
-            const fingerCurl = 25 * tuckFactor;
-            // 엄지
-            rotations["LEFT_THUMB1"] = [0, 0, fingerCurl];
-            rotations["LEFT_THUMB2"] = [fingerCurl * 0.8, 0, 0];
-            rotations["LEFT_THUMB3"] = [fingerCurl * 0.6, 0, 0];
-            rotations["RIGHT_THUMB1"] = [0, 0, -fingerCurl];
-            rotations["RIGHT_THUMB2"] = [fingerCurl * 0.8, 0, 0];
-            rotations["RIGHT_THUMB3"] = [fingerCurl * 0.6, 0, 0];
-            
-            // 검지, 중지, 약지, 새끼
-            const fingers = ["INDEX", "MIDDLE", "RING", "PINKY"];
+            // 손가락 - 자연스럽게 펴진 상태 유지
+            const fingers = ["THUMB", "INDEX", "MIDDLE", "RING", "PINKY"];
             fingers.forEach(finger => {
-                rotations[`LEFT_${finger}1`] = [fingerCurl * 0.7, 0, 0];
-                rotations[`LEFT_${finger}2`] = [fingerCurl * 1.2, 0, 0];
-                rotations[`LEFT_${finger}3`] = [fingerCurl * 0.9, 0, 0];
-                rotations[`RIGHT_${finger}1`] = [fingerCurl * 0.7, 0, 0];
-                rotations[`RIGHT_${finger}2`] = [fingerCurl * 1.2, 0, 0];
-                rotations[`RIGHT_${finger}3`] = [fingerCurl * 0.9, 0, 0];
+                if (finger === "THUMB") {
+                    rotations[`LEFT_${finger}1`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}2`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}3`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}1`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}2`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}3`] = [0, 0, 0];
+                } else {
+                    rotations[`LEFT_${finger}1`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}2`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}3`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}1`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}2`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}3`] = [0, 0, 0];
+                }
             });
             
-            // 척추
-            rotations["SPINE"] = [25 * tuckFactor, 0, 0];
-            rotations["SPINE1"] = [20 * tuckFactor, 0, 0];
-            rotations["NECK"] = [15 * tuckFactor, 0, 0];
+            // 척추 - 다리를 가슴으로 당기기 위해 굽힘
+            rotations["SPINE"] = [35 * tuckFactor, 0, 0];
+            rotations["SPINE1"] = [30 * tuckFactor, 0, 0];
+            rotations["NECK"] = [20 * tuckFactor, 0, 0];
             
         } else if (rotationRatio >= 0.85 || heightRatio < 0.2) {
             // Phase 3: 착지 준비
             const phaseT = Math.max((rotationRatio - 0.85) / 0.15, (0.2 - heightRatio) / 0.2);
             const landing = this.easeOut(Math.min(phaseT, 1.0));
-            tuckFactor = Math.max(0, 1 - landing);
+            const tuckFactor = Math.max(0, 1 - landing);
             
-            // 다리
-            rotations["LEFT_UPLEG"] = [120 * tuckFactor, 0, -5 * tuckFactor];
-            rotations["RIGHT_UPLEG"] = [120 * tuckFactor, 0, 5 * tuckFactor];
-            rotations["LEFT_LEG"] = [160 * tuckFactor, 0, 0];
-            rotations["RIGHT_LEG"] = [160 * tuckFactor, 0, 0];
+            // 다리 - 착지를 위해 펴기 시작
+            rotations["LEFT_UPLEG"] = [-((130 * tuckFactor) + (-15 * landing)), 0, -5 * tuckFactor];
+            rotations["RIGHT_UPLEG"] = [-((130 * tuckFactor) + (-15 * landing)), 0, 5 * tuckFactor];
+            rotations["LEFT_LEG"] = [(165 * tuckFactor) + landing, 0, 0];
+            rotations["RIGHT_LEG"] = [(165 * tuckFactor) + landing, 0, 0];
             
-            // 어깨 - 균형 잡기 위해 옆으로 벌림
-            rotations["LEFT_SHOULDER"] = [50 * tuckFactor + (-20 * landing), -10 * tuckFactor, -15 * tuckFactor + (25 * landing)];
-            rotations["RIGHT_SHOULDER"] = [50 * tuckFactor + (-20 * landing), 10 * tuckFactor, 15 * tuckFactor + (-25 * landing)];
+            // 어깨 - 착지 균형을 위해 점진적으로 내림
+            rotations["LEFT_SHOULDER"] = [-15 + (5 * landing), 0, -90 + (70 * landing)];
+            rotations["RIGHT_SHOULDER"] = [-15 + (5 * landing), 0, 90 + (-70 * landing)];
             
-            // 팔 - 균형을 위해 벌리는 동작
-            rotations["LEFT_ARM"] = [100 * tuckFactor + (-15 * landing), -10 * tuckFactor + (5 * landing), 40 * tuckFactor + (-30 * landing)];
-            rotations["RIGHT_ARM"] = [100 * tuckFactor + (-15 * landing), 10 * tuckFactor + (-5 * landing), -40 * tuckFactor + (30 * landing)];
-            rotations["LEFT_FOREARM"] = [90 * tuckFactor + (-30 * landing), -15 * tuckFactor, 0];
-            rotations["RIGHT_FOREARM"] = [90 * tuckFactor + (-30 * landing), 15 * tuckFactor, 0];
+            // 팔 - 착지 균형을 위해 점진적으로 내림
+            rotations["LEFT_ARM"] = [0, 0, 0];
+            rotations["RIGHT_ARM"] = [0, 0, 0];
+            rotations["LEFT_FOREARM"] = [15 * landing, 0, 0];
+            rotations["RIGHT_FOREARM"] = [15 * landing, 0, 0];
             
-            // 손 - 착지 준비로 자연스럽게
-            rotations["LEFT_HAND"] = [40 * tuckFactor + (-35 * landing), -10 * tuckFactor + (5 * landing), -20 * tuckFactor + (15 * landing)];
-            rotations["RIGHT_HAND"] = [40 * tuckFactor + (-35 * landing), 10 * tuckFactor + (-5 * landing), 20 * tuckFactor + (-15 * landing)];
+            // 손 - 착지 준비
+            rotations["LEFT_HAND"] = [5 * landing, 0, 0];
+            rotations["RIGHT_HAND"] = [5 * landing, 0, 0];
             
-            // 손가락 - 자연스럽게 펴짐
-            const fingerRelax = 25 * tuckFactor * (1 - landing);
-            // 엄지
-            rotations["LEFT_THUMB1"] = [0, 0, fingerRelax];
-            rotations["LEFT_THUMB2"] = [fingerRelax * 0.8, 0, 0];
-            rotations["LEFT_THUMB3"] = [fingerRelax * 0.6, 0, 0];
-            rotations["RIGHT_THUMB1"] = [0, 0, -fingerRelax];
-            rotations["RIGHT_THUMB2"] = [fingerRelax * 0.8, 0, 0];
-            rotations["RIGHT_THUMB3"] = [fingerRelax * 0.6, 0, 0];
-            
-            // 나머지 손가락들
-            const fingers = ["INDEX", "MIDDLE", "RING", "PINKY"];
+            // 손가락 - 자연스러운 상태 유지
+            const fingers = ["THUMB", "INDEX", "MIDDLE", "RING", "PINKY"];
             fingers.forEach(finger => {
-                rotations[`LEFT_${finger}1`] = [fingerRelax * 0.7, 0, 0];
-                rotations[`LEFT_${finger}2`] = [fingerRelax * 1.2, 0, 0];
-                rotations[`LEFT_${finger}3`] = [fingerRelax * 0.9, 0, 0];
-                rotations[`RIGHT_${finger}1`] = [fingerRelax * 0.7, 0, 0];
-                rotations[`RIGHT_${finger}2`] = [fingerRelax * 1.2, 0, 0];
-                rotations[`RIGHT_${finger}3`] = [fingerRelax * 0.9, 0, 0];
+                if (finger === "THUMB") {
+                    rotations[`LEFT_${finger}1`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}2`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}3`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}1`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}2`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}3`] = [0, 0, 0];
+                } else {
+                    rotations[`LEFT_${finger}1`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}2`] = [0, 0, 0];
+                    rotations[`LEFT_${finger}3`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}1`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}2`] = [0, 0, 0];
+                    rotations[`RIGHT_${finger}3`] = [0, 0, 0];
+                }
             });
             
-            // 척추
-            rotations["SPINE"] = [25 * tuckFactor, 0, 0];
-            rotations["SPINE1"] = [20 * tuckFactor, 0, 0];
-            rotations["NECK"] = [15 * tuckFactor, 0, 0];
+            // 척추 - 착지를 위해 점진적으로 펴기
+            rotations["SPINE"] = [35 * tuckFactor, 0, 0];
+            rotations["SPINE1"] = [30 * tuckFactor, 0, 0];
+            rotations["NECK"] = [20 * tuckFactor, 0, 0];
         }
 
         rotations["HIPS"][0] = globalRotationX;
@@ -1109,7 +1176,7 @@ class AnimationSystem {
 
         return { rotations, translations };
     }
-
+    
     backFlipAnimation(progress) {
         const rotations = { ...this.baseRotations };
         const translations = { ...this.baseTranslations };
