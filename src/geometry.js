@@ -250,24 +250,20 @@ function createClosedCylinder(radiusTop, radiusBottom, height, radialSegments, h
     let normals = [...cyl.normals];
     let indices = [...cyl.indices];
 
-    // Top center
     const topCenterIndex = vertices.length / 4;
     vertices.push(0, height, 0, 1.0);
     normals.push(0, 1, 0);
 
-    // Bottom center
     const bottomCenterIndex = topCenterIndex + 1;
     vertices.push(0, 0, 0, 1.0);
     normals.push(0, -1, 0);
 
-    // Top cap
     for (let i = 0; i < radialSegments; i++) {
         const curr = i;
         const next = (i + 1) % radialSegments;
         indices.push(topCenterIndex, curr, next);
     }
 
-    // Bottom cap
     const offset = (heightSegments) * (radialSegments + 1);
     for (let i = 0; i < radialSegments; i++) {
         const curr = offset + i;
@@ -282,7 +278,6 @@ function createClosedCylinder(radiusTop, radiusBottom, height, radialSegments, h
     };
 }
 
-// Texture가 적용된 구 
 function createTexturedSphere(radius, latBands, longBands) {
     let vertices = [];
     let normals = [];
@@ -303,26 +298,22 @@ function createTexturedSphere(radius, latBands, longBands) {
             const y = cosTheta;
             const z = sinPhi * sinTheta;
 
-            // 버텍스 좌표
             vertices.push(radius * x);
             vertices.push(radius * y);
             vertices.push(radius * z);
             vertices.push(1.0);
 
-            // 노말 벡터
             normals.push(x);
             normals.push(y);
             normals.push(z);
 
-            // 텍스처 좌표 (UV 좌표)
             const u = long / longBands;
             const v = lat / latBands;
             texCoords.push(u);
             texCoords.push(v);
         }
     }
-    
-    // 인덱스 생성
+
     for (let lat = 0; lat < latBands; lat++) {
         for (let long = 0; long < longBands; long++) {
             const first = (lat * (longBands + 1)) + long;
@@ -374,4 +365,89 @@ function createGroundPlane(width, depth) {
         texCoords,
         indices
     };
+}
+
+function createAstronautHelmet(radius = 0.15) {
+    const helmet = createTexturedSphere(radius, 24, 24);
+    return helmet;
+}
+
+function createBackpack(width = 0.3, height = 0.8, depth = 0.15) {
+    return createRoundBox(width, height, depth, 0.02);
+}
+
+function createChestPanel(width = 0.2, height = 0.15, depth = 0.05) {
+    return createRoundBox(width, height, depth, 0.01);
+}
+
+function createSpacesuitTorso(width = 0.4, height = 0.5, depth = 0.25) {
+    return createRoundBox(width, height, depth, 0.03);
+}
+
+function createSpacesuitArm(radius = 0.08, length = 1.0) {
+    return createClosedCylinder(radius, radius, length, 12, 4);
+}
+
+function createSpacesuitLeg(radius = 0.1, length = 1.0) {
+    return createClosedCylinder(radius, radius, length, 12, 4);
+}
+
+function createSpaceGlove(radius = 0.12) {
+    return createSphere(radius, 16, 16);
+}
+
+function createSpaceBoot(width = 0.15, height = 0.1, depth = 0.25) {
+    return createRoundBox(width, height, depth, 0.02);
+}
+
+function cloneGeometry(geometry) {
+    return {
+        vertices: [...geometry.vertices],
+        normals: [...geometry.normals],
+        indices: [...geometry.indices],
+        texCoords: geometry.texCoords ? [...geometry.texCoords] : undefined
+    };
+}
+
+function translateGeometry(geometry, translation) {
+    const [tx, ty, tz] = translation;
+    
+    for (let i = 0; i < geometry.vertices.length; i += 4) {
+        geometry.vertices[i] += tx;
+        geometry.vertices[i + 1] += ty;
+        geometry.vertices[i + 2] += tz;
+    }
+    
+    return geometry;
+}
+
+function mergeGeometries(...geometries) {
+    const merged = {
+        vertices: [],
+        normals: [],
+        indices: [],
+        texCoords: []
+    };
+    
+    let vertexOffset = 0;
+    
+    for (const geometry of geometries) {
+        merged.vertices.push(...geometry.vertices);
+        merged.normals.push(...geometry.normals);
+
+        if (geometry.texCoords) {
+            merged.texCoords.push(...geometry.texCoords);
+        }
+
+        const adjustedIndices = geometry.indices.map(index => index + vertexOffset);
+        merged.indices.push(...adjustedIndices);
+
+        vertexOffset += geometry.vertices.length / 4; 
+    }
+    
+    if (merged.texCoords.length === 0) {
+        delete merged.texCoords;
+    }
+    
+    return merged;
 }
