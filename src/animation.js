@@ -738,7 +738,7 @@ class AnimationSystem {
         if (isLeftStep) {
             // 왼발이 움직이는 단계
             const leftLegLift = liftCurve * legLiftHeight * 0.4 + hipSway; // 0.25에서 0.4로 증가
-            const leftKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 25 - (landingFactor * 10)); 
+            const leftKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 45 - (landingFactor * 10)); 
             const leftAnkleFlexion = -liftCurve * legLiftHeight * 1.2 + (landingFactor * 5); 
             
             rotations["LEFT_UPLEG"] = [
@@ -765,7 +765,7 @@ class AnimationSystem {
         } else {
             // 오른발이 움직이는 단계
             const rightLegLift = -liftCurve * legLiftHeight * 0.4 - hipSway; // 0.25에서 0.4로 증가
-            const rightKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 25 - (landingFactor * 10)); // 0.6에서 0.8로 증가
+            const rightKneeFlexion = Math.max(0, liftCurve * legLiftHeight * 45 - (landingFactor * 10)); // 0.6에서 0.8로 증가
             const rightAnkleFlexion = -liftCurve * legLiftHeight * 1.2 + (landingFactor * 5); // 0.3에서 0.4로 증가
             
             rotations["RIGHT_UPLEG"] = [
