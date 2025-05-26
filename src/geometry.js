@@ -345,3 +345,33 @@ function createTexturedSphere(radius, latBands, longBands) {
         indices: indices
     };
 }
+
+function createGroundPlane(width, depth) {
+    const w = width / 2;
+    const d = depth / 2;
+
+    const vertices = [
+        -w, 0.0, -d, 1.0,
+         w, 0.0, -d, 1.0,
+         w, 0.0,  d, 1.0,
+        -w, 0.0,  d, 1.0
+    ];
+
+    const normals = [
+        0, 1, 0,  0, 1, 0,
+        0, 1, 0,  0, 1, 0
+    ];
+
+    const texCoords = [
+        0, 0, 1, 0, 1, 1, 0, 1
+    ];
+
+    const indices = [0, 1, 2, 0, 2, 3];
+
+    return {
+        vertices,
+        normals,
+        texCoords,
+        indices
+    };
+}

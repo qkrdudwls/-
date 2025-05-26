@@ -20,7 +20,12 @@ let sphereData, cylinderData;
 // Texture
 let texturedSphereData;
 let texturedSphereBuffer, texturedSphereIndexBuffer, texturedSphereNormalBuffer, texturedSphereTexCoordBuffer;
+
 let uTexture, uUseTexture, texture;
+let groundBuffer, groundIndexBuffer, groundNormalBuffer;
+let groundData;
+let groundTexture;
+let groundTexCoordBuffer;
 
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
 
@@ -259,6 +264,9 @@ window.onload = function init() {
     program = initShaders(gl, "vertex-shader", "fragment-shader");
     gl.useProgram(program);
 
+    uTexture = gl.getUniformLocation(program, "uTexture");
+    uUseTexture = gl.getUniformLocation(program, "uUseTexture");
+
     uModelViewMatrix = gl.getUniformLocation(program, "uModelViewMatrix");
     uProjectionMatrix = gl.getUniformLocation(program, "uProjectionMatrix");
     uNormalMatrix = gl.getUniformLocation(program, "uNormalMatrix");
@@ -300,16 +308,51 @@ window.onload = function init() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cylinderIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cylinderData.indices), gl.STATIC_DRAW);
 
+    function initGround() {
+    groundData = createGroundPlane(10.0, 10.0);
+
+    groundBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(groundData.vertices), gl.STATIC_DRAW);
+
+    groundNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(groundData.normals), gl.STATIC_DRAW);
+
+    groundTexCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundTexCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(groundData.texCoords), gl.STATIC_DRAW);
+
+    groundIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, groundIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(groundData.indices), gl.STATIC_DRAW);
+
+    groundTexture = gl.createTexture();
+    const image = new Image();
+    image.onload = function() {
+        gl.bindTexture(gl.TEXTURE_2D, groundTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    };
+    image.src = "./mars.jpg";
+    }
+
     // Textured sphere
     addTexturedSphereInit();
+    initGround();
 
     root = buildTreeFromHierarchy(JOINTS, hierarchy, renderJoint);
 
     modelViewMatrix = lookAt(eye, at, up);
     projectionMatrix = perspective(60, canvas.width / canvas.height, 0.1, 10.0);
 
-    setEarth();
-    animationSystem.startAnimation("frontFlip", null, false);
+    setMoon();
+    animationSystem.startAnimation("spaceWalk", null, false);
 
     render();
 }
@@ -411,6 +454,43 @@ function renderBone(from, to, parentName, childName) {
     gl.drawElements(gl.TRIANGLES, customCylinder.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
+function renderGround() {
+    gl.useProgram(program);
+    gl.uniform1i(uUseTexture, 1); // 텍스처 사용
+
+    const mvMatrix = mult(modelViewMatrix, translate(0.0, -0.85, 0.0));
+    gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(mvMatrix));
+    gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
+    const normalMatrix = transpose(inverse4(mvMatrix));
+    gl.uniformMatrix4fv(uNormalMatrix, false, flatten(normalMatrix));
+
+    const vPosition = gl.getAttribLocation(program, "vPosition");
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundBuffer);
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vPosition);
+
+    const vNormal = gl.getAttribLocation(program, "vNormal");
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundNormalBuffer);
+    gl.vertexAttribPointer(vNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vNormal);
+
+    const vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundTexCoordBuffer);
+    gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(vTexCoord);
+
+    // 텍스처 바인딩
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, groundTexture);
+    gl.uniform1i(uTexture, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, groundIndexBuffer);
+    gl.drawElements(gl.TRIANGLES, groundData.indices.length, gl.UNSIGNED_SHORT, 0);
+
+    // 다음 렌더를 위해 비활성화
+    gl.uniform1i(uUseTexture, 0);
+}
+
 function render(time = 0) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -420,8 +500,8 @@ function render(time = 0) {
     const result = animationSystem.updateAnimation(deltaTime);
     if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
 
+    renderGround();
     traverse(root);
-
     renderTexturedSphere();
 
     requestAnimationFrame(render);
