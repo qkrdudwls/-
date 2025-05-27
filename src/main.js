@@ -29,6 +29,7 @@ let groundTexCoordBuffer;
 let uLightPosition, uLightColor, uAmbientLight, uDiffuseStrength;
 
 let helmetTexture, spacesuitTexture, metalTexture, glassTexture;
+let plssTexture, chestControlTexture, bootTexture;
 
 let lastTime = 0;
 let currentEnvironment = 'earth';
@@ -175,16 +176,6 @@ function initGround() {
 
 function initTextures() {
     helmetTexture = gl.createTexture();
-    const helmetImage = new Image();
-    helmetImage.onload = function() {
-        gl.bindTexture(gl.TEXTURE_2D, helmetTexture);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, helmetImage);
-        gl.generateMipmap(gl.TEXTURE_2D);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    };
-
     createGoldVisorTexture(helmetTexture);
 
     spacesuitTexture = gl.createTexture();
@@ -192,25 +183,52 @@ function initTextures() {
 
     metalTexture = gl.createTexture();
     createMetalTexture(metalTexture);
+
+    plssTexture = gl.createTexture();
+    createPLSSTexture(plssTexture);
+
+    chestControlTexture = gl.createTexture();
+    createChestControlTexture(chestControlTexture);
+
+    bootTexture = gl.createTexture();
+    createSpaceBootTexture(bootTexture);
 }
 
 function createGoldVisorTexture(texture) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
     gradient.addColorStop(0, '#FFD700');
-    gradient.addColorStop(0.5, '#FFA500');
-    gradient.addColorStop(1, '#FF8C00');
+    gradient.addColorStop(0.3, '#FFC000');
+    gradient.addColorStop(0.6, '#FFB000');
+    gradient.addColorStop(0.8, '#D4AF37');
+    gradient.addColorStop(1, '#B8860B');
 
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillRect(0, 0, 512, 512);
+
+    ctx.globalCompositeOperation = 'screen';
+    const highlight = ctx.createLinearGradient(0, 0, 512, 200);
+    highlight.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+    highlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+    highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.fillStyle = highlight;
+    ctx.fillRect(0, 0, 512, 200);
 
     ctx.globalCompositeOperation = 'overlay';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fillRect(0, 0, 256, 128);
+    for (let i = 0; i < 5; i++) {
+        const y = i * 100 + 50;
+        const curveGradient = ctx.createLinearGradient(0, y - 20, 0, y + 20);
+        curveGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+        curveGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+        curveGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = curveGradient;
+        ctx.fillRect(0, y - 20, 512, 40);
+    }
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
@@ -221,16 +239,67 @@ function createGoldVisorTexture(texture) {
 
 function createSpaceSuitFabricTexture(texture) {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#F8F8F8';
-    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#F5F5F5';
+    ctx.fillRect(0, 0, 512, 512);
 
-    for (let i = 0; i < 1000; i++) {
-        ctx.fillStyle = `rgba(240, 240, 240, ${Math.random() * 0.3})`;
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+    for (let y = 0; y < 512; y += 4) {
+        for (let x = 0; x < 512; x += 4) {
+            const intensity = 0.95 + Math.sin(x * 0.1) * 0.02 + Math.sin(y * 0.1) * 0.02;
+            const color = Math.floor(245 * intensity);
+            ctx.fillStyle = `rgb(${color}, ${color}, ${color})`;
+            ctx.fillRect(x, y, 2, 2);
+        }
+    }
+
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 512; i += 8) {
+        ctx.strokeStyle = '#E8E8E8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 512);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(512, i);
+        ctx.stroke();
+    }
+
+    ctx.globalAlpha = 0.15;
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const size = Math.random() * 3 + 1;
+        const brightness = Math.random() * 20 + 235;
+        ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+        ctx.fillRect(x, y, size, size);
+    }
+
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = '#D0D0D0';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(128, 0);
+    ctx.lineTo(128, 512);
+    ctx.moveTo(384, 0);
+    ctx.lineTo(384, 512);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 100; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const radius = Math.random() * 10 + 5;
+        ctx.fillStyle = '#E0E0E0';
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -242,17 +311,204 @@ function createSpaceSuitFabricTexture(texture) {
 
 function createMetalTexture(texture) {
     const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#C5C5C5';
+    ctx.fillRect(0, 0, 512, 512);
+
+    for (let i = 0; i < 512; i++) {
+        const intensity = 0.8 + Math.sin(i * 0.05) * 0.15 + Math.random() * 0.1;
+        const color = Math.floor(197 * intensity);
+        ctx.strokeStyle = `rgb(${color}, ${color}, ${color})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(512, i);
+        ctx.stroke();
+    }
+
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 1000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const size = Math.random() * 2 + 1;
+        const brightness = Math.random() * 40 + 180;
+        ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+        ctx.fillRect(x, y, size, size);
+    }
+
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#808080';
+    for (let i = 0; i < 20; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#E0E0E0';
+        ctx.beginPath();
+        ctx.arc(x - 1, y - 1, 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#808080';
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+}
+
+function createPLSSTexture(texture) {
+    // PLSS (Portable Life Support System) - backpack texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Base white with slight blue tint (like actual PLSS)
+    ctx.fillStyle = '#F8F8FF';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Add control panel areas
+    ctx.fillStyle = '#E0E0E0';
+    ctx.fillRect(50, 100, 200, 150);
+    ctx.fillRect(300, 200, 150, 100);
+
+    // Add warning labels and text areas (simulated)
+    ctx.fillStyle = '#FF4444';
+    ctx.fillRect(60, 110, 80, 20);
+    ctx.fillRect(320, 210, 60, 15);
+
+    // Add NASA logo area
+    ctx.fillStyle = '#1E3A8A';
+    ctx.fillRect(400, 50, 80, 40);
+
+    // Add control knobs and switches
+    ctx.fillStyle = '#606060';
+    for (let i = 0; i < 10; i++) {
+        const x = 80 + (i % 3) * 40;
+        const y = 140 + Math.floor(i / 3) * 30;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add highlight
+        ctx.fillStyle = '#A0A0A0';
+        ctx.beginPath();
+        ctx.arc(x - 2, y - 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#606060';
+    }
+
+    // Add cooling lines texture
+    ctx.strokeStyle = '#D0D0D0';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        ctx.moveTo(20, 50 + i * 60);
+        ctx.lineTo(490, 50 + i * 60);
+        ctx.stroke();
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+}
+
+function createChestControlTexture(texture) {
+    // DCM (Display and Control Module) chest control texture
+    const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    const gradient = ctx.createLinearGradient(0, 0, 256, 256);
-    gradient.addColorStop(0, '#C0C0C0');
-    gradient.addColorStop(0.5, '#808080');
-    gradient.addColorStop(1, '#404040');
-
-    ctx.fillStyle = gradient;
+    // Base dark panel
+    ctx.fillStyle = '#2A2A2A';
     ctx.fillRect(0, 0, 256, 256);
+
+    // Add main display area
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(20, 20, 216, 80);
+
+    // Add LED indicators
+    const colors = ['#00FF00', '#FF0000', '#FFFF00', '#0000FF'];
+    for (let i = 0; i < 8; i++) {
+        ctx.fillStyle = colors[i % 4];
+        ctx.beginPath();
+        ctx.arc(30 + i * 25, 130, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Add control buttons
+    ctx.fillStyle = '#808080';
+    for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 4; col++) {
+            const x = 40 + col * 45;
+            const y = 160 + row * 25;
+            ctx.fillRect(x, y, 20, 15);
+            
+            // Add button highlight
+            ctx.fillStyle = '#C0C0C0';
+            ctx.fillRect(x + 1, y + 1, 18, 2);
+            ctx.fillStyle = '#808080';
+        }
+    }
+
+    // Add NASA text area
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '12px Arial';
+    ctx.fillText('NASA', 200, 40);
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+}
+
+function createSpaceBootTexture(texture) {
+    // EMU boots texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Base white boot color
+    ctx.fillStyle = '#F0F0F0';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Add sole pattern
+    ctx.fillStyle = '#404040';
+    ctx.fillRect(0, 200, 256, 56);
+
+    // Add tread pattern on sole
+    ctx.fillStyle = '#606060';
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 4; j++) {
+            ctx.fillRect(10 + i * 30, 210 + j * 10, 20, 5);
+        }
+    }
+
+    // Add boot reinforcement areas
+    ctx.fillStyle = '#E0E0E0';
+    ctx.fillRect(20, 50, 216, 30);
+    ctx.fillRect(50, 100, 156, 40);
+
+    // Add lace/strap areas
+    ctx.strokeStyle = '#C0C0C0';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(80, 60 + i * 15);
+        ctx.lineTo(176, 60 + i * 15);
+        ctx.stroke();
+    }
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
@@ -452,13 +708,13 @@ function renderCustomGeometry(worldMatrix, geometry, texture, scale) {
 function renderBackPack(worldMatrix) {
     const backpackGeometry = createBackpack(0.3, 0.4, 0.15);
     const backpackMatrix = mult(worldMatrix, mult(translate(0, 0, -0.2), scalem(1, 1, 1)));
-    renderCustomGeometry(backpackMatrix, backpackGeometry, metalTexture, 1.0);
+    renderCustomGeometry(backpackMatrix, backpackGeometry, plssTexture, 1.0);
 }
 
 function renderChestPanel(worldMatrix) {
     const panelGeometry = createChestPanel(0.2, 0.15, 0.05);
     const panelMatrix = mult(worldMatrix, mult(translate(0, -0.1, 0.15), scalem(1, 1, 1)));
-    renderCustomGeometry(panelMatrix, panelGeometry, metalTexture, 1.0);
+    renderCustomGeometry(panelMatrix, panelGeometry, chestControlTexture, 1.0);
 }
 
 function renderDefaultSphere(worldMatrix, scale) {
