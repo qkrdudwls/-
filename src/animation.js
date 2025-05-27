@@ -247,8 +247,8 @@ class AnimationSystem {
             const phaseT = progress / 0.3;
             const raise = this.easeInOut(phaseT);
 
-            rotations["LEFT_SHOULDER"] = [45 * raise, 15 * raise, -70 * raise];
-            rotations["LEFT_ARM"] = [85 * raise, 70 * raise, -45 * raise];
+            rotations["LEFT_SHOULDER"] = [-45 * raise, 15 * raise, -90 * raise];
+            rotations["LEFT_ARM"] = [0, 70 * raise, -45 * raise];
             rotations["LEFT_FOREARM"] = [0, 0, -45 * raise];
             rotations["LEFT_HAND"] = [20 * raise, 0, 0];
             rotations["LEFT_THUMB1"] = [0, 0, -12 * raise];
@@ -268,11 +268,11 @@ class AnimationSystem {
             const phaseT = (progress - 0.3) / 0.6;
             waveProgress = this.easeInOut(phaseT);
 
-            const shoulderWave = Math.sin(waveProgress * Math.PI * 4) * 15;
-            rotations["LEFT_SHOULDER"] = [45 + shoulderWave * 0.3, 15, -70 + shoulderWave * 0.5];
+            const shoulderWave = Math.sin(waveProgress * Math.PI * 4) * 45;
+            rotations["LEFT_SHOULDER"] = [-45 + shoulderWave * 0.3, 15, -90 + shoulderWave * 0.5];
 
-            const armWave = Math.sin(waveProgress * Math.PI * 4) * 35;
-            rotations["LEFT_ARM"] = [85 + armWave * 0.4, 70 + armWave * 0.6, -45 + armWave];
+            const armWave = Math.sin(waveProgress * Math.PI * 4) * 45;
+            rotations["LEFT_ARM"] = [0, 70 + armWave * 0.6, -45 + armWave];
 
             const forearmWave = Math.sin(waveProgress * Math.PI * 4) * 40;
             rotations["LEFT_FOREARM"] = [0, 0, -45 + forearmWave];
@@ -297,8 +297,8 @@ class AnimationSystem {
             const phaseT = (progress - 0.9) / 0.1;
             const lower = this.easeInOut(phaseT);
 
-            rotations["LEFT_SHOULDER"] = [45 * (1 - lower), 15 * (1 - lower), -70 * (1 - lower)];
-            rotations["LEFT_ARM"] = [85 * (1 - lower), 70 * (1 - lower), -45 * (1 - lower)];
+            rotations["LEFT_SHOULDER"] = [-45 * (1 - lower), 15 * (1 - lower), -90 * (1 - lower)];
+            rotations["LEFT_ARM"] = [0, 70 * (1 - lower), -45 * (1 - lower)];
             rotations["LEFT_FOREARM"] = [0, 0, -45 * (1 - lower)];
             rotations["LEFT_HAND"] = [20 * (1 - lower), 0, 0];
 
