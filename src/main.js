@@ -34,6 +34,20 @@ let plssTexture, chestControlTexture, bootTexture;
 let lastTime = 0;
 let currentEnvironment = 'earth';
 
+window.groundOffsetZ = 0.0;
+
+//camera 위치
+const cameraStart = vec3(-5, 2, 5);
+const cameraEnd = vec3(5, 2, 5);
+
+function lerpVec3(a, b, t) {
+    return vec3(
+        a[0] * (1 - t) + b[0] * t,
+        a[1] * (1 - t) + b[1] * t,
+        a[2] * (1 - t) + b[2] * t
+    );
+}
+
 function createNode(name, translation, render, sibling = null, child = null) {
     let node = {
         name: name,
@@ -141,7 +155,7 @@ function traverse(root) {
 }
 
 function initGround() {
-    groundData = createGroundPlane(10.0, 10.0);
+    groundData = createGroundPlane(100.0, 100.0);
 
     groundBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, groundBuffer);
@@ -171,7 +185,22 @@ function initGround() {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     };
-    image.src = "./images/venus.jpg";
+    image.src = "./images/earth.jpg";
+}
+
+function updateGroundTexture(imagePath) {
+    const image = new Image();
+    image.onload = function () {
+        gl.bindTexture(gl.TEXTURE_2D, groundTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    };
+    image.src = imagePath;
 }
 
 function initTextures() {
@@ -541,6 +570,29 @@ window.onload = function init() {
     uAmbientLight = gl.getUniformLocation(program, "uAmbientLight");
     uDiffuseStrength = gl.getUniformLocation(program, "uDiffuseStrength");
 
+        //camera
+    document.getElementById("cameraSlider").addEventListener("input", (e) => {
+        const t = parseFloat(e.target.value);
+        eye = lerpVec3(cameraStart, cameraEnd, t);
+        modelViewMatrix = lookAt(eye, at, up);
+    });
+    document.addEventListener("keydown", (e) => {
+        const key = e.key.toLowerCase();
+        const step = 0.1;
+
+        // 카메라가 at 쪽을 향하는 단위 벡터
+        const viewDir = normalize(subtract(at, eye));
+
+        if (key === "m") {
+            // 확대: 앞으로 전진
+            eye = add(eye, scale(step, viewDir));
+        } else if (key === "n") {
+            // 축소: 뒤로 후퇴
+            eye = subtract(eye, scale(step, viewDir));
+        }
+        modelViewMatrix = lookAt(eye, at, up);
+    });
+
     gl.uniform3fv(uLightPosition, flatten(vec3(1.0, 2.0, 2.0)));
     gl.uniform3fv(uLightColor, flatten(vec3(1.0, 1.0, 1.0)));
     gl.uniform3fv(uAmbientLight, flatten(vec3(0.2, 0.2, 0.2)));
@@ -811,7 +863,7 @@ function renderGround() {
     gl.useProgram(program);
     gl.uniform1i(uUseTexture, 1);
 
-    const mvMatrix = mult(modelViewMatrix, translate(0.0, -0.85, 0.0));
+    const mvMatrix = mult(modelViewMatrix, translate(0.0, -0.85, window.groundOffsetZ || 0.0));
     gl.uniformMatrix4fv(uModelViewMatrix, false, flatten(mvMatrix));
     gl.uniformMatrix4fv(uProjectionMatrix, false, flatten(projectionMatrix));
     const normalMatrix = transpose(inverse4(mvMatrix));
@@ -848,8 +900,11 @@ function render(time = 0) {
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    const result = animationSystem.updateAnimation(deltaTime);
-    if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
+    //const result = animationSystem.updateAnimation(deltaTime);
+    //if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
+
+    const result = updateAnimations(deltaTime, root);
+
 
     renderGround();
     traverse(root);
