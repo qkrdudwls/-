@@ -1189,9 +1189,20 @@ function playAnimation(type, duration = 2000, loops = false) {
 }
 
 function updateAnimations(deltaTime, rootNode) {
-    const result = animationSystem.updateAnimation(deltaTime);
+    const anim = animationSystem;
+
+    if (anim.currentAnimation === 'walk' || anim.currentAnimation === 'spaceWalk') {
+    if (typeof window.groundOffsetZ !== 'undefined') {
+        const direction = -1; // 뒤로 밀리는 방향
+        const step = (anim.currentAnimation === 'walk') ? 0.001 : 0.002;
+        window.groundOffsetZ += direction * step * deltaTime;
+    }
+    }    
+    
+    const result = anim.updateAnimation(deltaTime);
+
     if (result) {
-        animationSystem.applyAnimationToTree(rootNode, result.rotations, result.translations);
+        anim.applyAnimationToTree(rootNode, result.rotations, result.translations);
     }
     return result;
 }
@@ -1221,30 +1232,40 @@ function setSpaceEnvironment(environment) {
     switch(environment.toLowerCase()) {
 	case 'mercury':
 	    setGravity(GRAVITY_PRESETS.MERCURY);
+        updateGroundTexture('images/mercury.jpg');
 	    break;
 	case 'venus':
 	    setGravity(GRAVITY_PRESETS.VENUS);
+        updateGroundTexture('images/venus.jpg');
 	    break;
     case 'earth':
         setGravity(GRAVITY_PRESETS.EARTH);
+        updateGroundTexture('images/earth.jpg');
         break;
     case 'moon':
         setGravity(GRAVITY_PRESETS.MOON);
+        updateGroundTexture('images/moon.jpg');
         break;
     case 'mars':
         setGravity(GRAVITY_PRESETS.MARS);
+        updateGroundTexture('images/mars.jpg');
         break;
     case 'jupiter':
         setGravity(GRAVITY_PRESETS.JUPITER);
+        updateGroundTexture('images/jupiter.jpg');
         break;
 	case 'saturn':
 	    setGravity(GRAVITY_PRESETS.SATURN);
+        updateGroundTexture('images/saturn.jpg');
 	    break;
 	case 'uranus':
 	    setGravity(GRAVITY_PRESETS.URANUS);
+        updateGroundTexture('images/uranus.jpg');
 	    break;
 	case 'nepture':
 	    setGravity(GRAVITY_PRESETS.NEPTUNE);
+        updateGroundTexture('images/neptune.jpg');
+        updateGroundTexture('images/earth.jpg');
 	    break;
     default:
         setGravity(GRAVITY_PRESETS.EARTH);
@@ -1262,3 +1283,4 @@ window.animationSystem = animationSystem;
 window.playAnimation = playAnimation;
 window.setGravity = setGravity;
 window.setSpaceEnvironment = setSpaceEnvironment;
+window.groundOffsetZ = groundOffsetZ;
