@@ -378,11 +378,15 @@ function renderJoint(worldMatrix, jointName) {
             scale = 1.0;
             useCustomGeometry = true;
             break;
-            
-        default:
+        case "LEFT_SHOULDER":
+        case "RIGHT_SHOULDER":
+        case "LEFT_FOREARM":
+        case "RIGHT_FOREARM":
             geometry = sphereData;
             texture = spacesuitTexture;
-            scale = 0.5;
+            scale = 1.25;
+            break;
+        default:
             break;
     }
 

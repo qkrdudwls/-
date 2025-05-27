@@ -172,7 +172,7 @@ function createBox(width, height, depth) {
     };
 }
 
-function createRoundBox(width, height, depth, radius = 0.03, segments = 8) {
+function createRoundBox(width, height, depth, radius = 0.03, segments = 0) {
     const box = createBox(width - 2 * radius, height - 2 * radius, depth - 2 * radius);
     const corner = createSphere(radius, segments, segments);
     const parts = [box];
@@ -197,7 +197,7 @@ function createRoundBox(width, height, depth, radius = 0.03, segments = 8) {
 
 function createHelmet(radius = 0.12) {
     return createSphere(radius, 24, 24);
-}
+} 
 
 function createEdge(width, height, depth) {
     return createRoundBox(width, height, depth, 0.02);
@@ -209,8 +209,7 @@ function calculateCylinderMatrix(from, to) {
     
     const dirVec = subtract(toPoint, fromPoint);
     
-    const cylinderLength = length(dirVec);
-    
+    const cylinderLength = length(dirVec);   
     if (cylinderLength < 0.00001) {
         return translate(fromPoint[0], fromPoint[1], fromPoint[2]);
     }
