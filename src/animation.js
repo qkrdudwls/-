@@ -1262,10 +1262,9 @@ function setSpaceEnvironment(environment) {
 	    setGravity(GRAVITY_PRESETS.URANUS);
         updateGroundTexture('images/uranus.jpg');
 	    break;
-	case 'nepture':
+	case 'neptune':
 	    setGravity(GRAVITY_PRESETS.NEPTUNE);
         updateGroundTexture('images/neptune.jpg');
-        updateGroundTexture('images/earth.jpg');
 	    break;
     default:
         setGravity(GRAVITY_PRESETS.EARTH);
@@ -1273,7 +1272,7 @@ function setSpaceEnvironment(environment) {
     const buttons = document.querySelectorAll('#planets button');
     buttons.forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent.toLowerCase() === environment.toLowerCase()) {
+        if (btn.getAttribute('data-environment') === environment.toLowerCase()) {
             btn.classList.add('active');
         }
     });
