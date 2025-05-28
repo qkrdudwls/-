@@ -392,7 +392,6 @@ function createMetalTexture(texture) {
 }
 
 function createPLSSTexture(texture) {
-    // PLSS (Portable Life Support System) - backpack texture
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
