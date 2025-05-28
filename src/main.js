@@ -466,8 +466,7 @@ function createChestControlTexture(texture) {
             const x = 40 + col * 45;
             const y = 160 + row * 25;
             ctx.fillRect(x, y, 20, 15);
-            
-            // Add button highlight
+
             ctx.fillStyle = '#C0C0C0';
             ctx.fillRect(x + 1, y + 1, 18, 2);
             ctx.fillStyle = '#808080';
