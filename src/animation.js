@@ -511,8 +511,8 @@ class AnimationSystem {
         if (progress < prepPhaseRatio) {
             const prep = this.easeOut(progress / prepPhaseRatio);
 
-            rotations["LEFT_UPLEG"] = [45 * prep, 0, -5];
-            rotations["RIGHT_UPLEG"] = [45 * prep, 0, 5];
+            rotations["LEFT_UPLEG"] = [-45 * prep, 0, -5];
+            rotations["RIGHT_UPLEG"] = [-45 * prep, 0, 5];
             rotations["LEFT_LEG"] = [85 * prep, 0, 0];
             rotations["RIGHT_LEG"] = [85 * prep, 0, 0];
             rotations["LEFT_FOOT"] = [-20 * prep, 0, 0];
@@ -539,8 +539,8 @@ class AnimationSystem {
 
             rotations["LEFT_UPLEG"] = [15, 0, -3];
             rotations["RIGHT_UPLEG"] = [15, 0, 3];
-            rotations["LEFT_LEG"] = [25, 0, 0];
-            rotations["RIGHT_LEG"] = [25, 0, 0];
+            rotations["LEFT_LEG"] = [0, 0, 0];
+            rotations["RIGHT_LEG"] = [0, 0, 0];
             rotations["LEFT_FOOT"] = [-10, 0, 0];
             rotations["RIGHT_FOOT"] = [-10, 0, 0];
 
@@ -1193,7 +1193,7 @@ function updateAnimations(deltaTime, rootNode) {
 
     if (anim.currentAnimation === 'walk' || anim.currentAnimation === 'spaceWalk') {
     if (typeof window.groundOffsetZ !== 'undefined') {
-        const direction = -1; // 뒤로 밀리는 방향
+        const direction = -1;
         const step = (anim.currentAnimation === 'walk') ? 0.001 : 0.002;
         window.groundOffsetZ += direction * step * deltaTime;
     }
@@ -1232,39 +1232,39 @@ function setSpaceEnvironment(environment) {
     switch(environment.toLowerCase()) {
 	case 'mercury':
 	    setGravity(GRAVITY_PRESETS.MERCURY);
-        updateGroundTexture('images/mercury.jpg');
+        updateGroundTexture('./images/mercury.jpg');
 	    break;
 	case 'venus':
 	    setGravity(GRAVITY_PRESETS.VENUS);
-        updateGroundTexture('images/venus.jpg');
+        updateGroundTexture('./images/venus.jpg');
 	    break;
     case 'earth':
         setGravity(GRAVITY_PRESETS.EARTH);
-        updateGroundTexture('images/earth.jpg');
+        updateGroundTexture('./images/earth.jpg');
         break;
     case 'moon':
         setGravity(GRAVITY_PRESETS.MOON);
-        updateGroundTexture('images/moon.jpg');
+        updateGroundTexture('./images/moon.jpg');
         break;
     case 'mars':
         setGravity(GRAVITY_PRESETS.MARS);
-        updateGroundTexture('images/mars.jpg');
+        updateGroundTexture('./images/mars.jpg');
         break;
     case 'jupiter':
         setGravity(GRAVITY_PRESETS.JUPITER);
-        updateGroundTexture('images/jupiter.jpg');
+        updateGroundTexture('./images/jupiter.jpg');
         break;
 	case 'saturn':
 	    setGravity(GRAVITY_PRESETS.SATURN);
-        updateGroundTexture('images/saturn.jpg');
+        updateGroundTexture('./images/saturn.jpg');
 	    break;
 	case 'uranus':
 	    setGravity(GRAVITY_PRESETS.URANUS);
-        updateGroundTexture('images/uranus.jpg');
+        updateGroundTexture('./images/uranus.jpg');
 	    break;
 	case 'neptune':
 	    setGravity(GRAVITY_PRESETS.NEPTUNE);
-        updateGroundTexture('images/neptune.jpg');
+        updateGroundTexture('./images/neptune.jpg');
 	    break;
     default:
         setGravity(GRAVITY_PRESETS.EARTH);
