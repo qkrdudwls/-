@@ -397,26 +397,19 @@ function createPLSSTexture(texture) {
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
-
-    // Base white with slight blue tint (like actual PLSS)
     ctx.fillStyle = '#F8F8FF';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Add control panel areas
     ctx.fillStyle = '#E0E0E0';
     ctx.fillRect(50, 100, 200, 150);
     ctx.fillRect(300, 200, 150, 100);
-
-    // Add warning labels and text areas (simulated)
     ctx.fillStyle = '#FF4444';
     ctx.fillRect(60, 110, 80, 20);
     ctx.fillRect(320, 210, 60, 15);
 
-    // Add NASA logo area
     ctx.fillStyle = '#1E3A8A';
     ctx.fillRect(400, 50, 80, 40);
 
-    // Add control knobs and switches
     ctx.fillStyle = '#606060';
     for (let i = 0; i < 10; i++) {
         const x = 80 + (i % 3) * 40;
@@ -424,8 +417,7 @@ function createPLSSTexture(texture) {
         ctx.beginPath();
         ctx.arc(x, y, 8, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Add highlight
+
         ctx.fillStyle = '#A0A0A0';
         ctx.beginPath();
         ctx.arc(x - 2, y - 2, 3, 0, Math.PI * 2);
@@ -433,7 +425,6 @@ function createPLSSTexture(texture) {
         ctx.fillStyle = '#606060';
     }
 
-    // Add cooling lines texture
     ctx.strokeStyle = '#D0D0D0';
     ctx.lineWidth = 2;
     for (let i = 0; i < 8; i++) {
@@ -451,21 +442,16 @@ function createPLSSTexture(texture) {
 }
 
 function createChestControlTexture(texture) {
-    // DCM (Display and Control Module) chest control texture
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
-    const ctx = canvas.getContext('2d');
 
-    // Base dark panel
+    const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#2A2A2A';
     ctx.fillRect(0, 0, 256, 256);
-
-    // Add main display area
     ctx.fillStyle = '#000000';
     ctx.fillRect(20, 20, 216, 80);
 
-    // Add LED indicators
     const colors = ['#00FF00', '#FF0000', '#FFFF00', '#0000FF'];
     for (let i = 0; i < 8; i++) {
         ctx.fillStyle = colors[i % 4];
@@ -474,7 +460,6 @@ function createChestControlTexture(texture) {
         ctx.fill();
     }
 
-    // Add control buttons
     ctx.fillStyle = '#808080';
     for (let row = 0; row < 3; row++) {
         for (let col = 0; col < 4; col++) {
@@ -489,7 +474,6 @@ function createChestControlTexture(texture) {
         }
     }
 
-    // Add NASA text area
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '12px Arial';
     ctx.fillText('NASA', 200, 40);
@@ -502,34 +486,26 @@ function createChestControlTexture(texture) {
 }
 
 function createSpaceBootTexture(texture) {
-    // EMU boots texture
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    // Base white boot color
     ctx.fillStyle = '#F0F0F0';
     ctx.fillRect(0, 0, 256, 256);
-
-    // Add sole pattern
     ctx.fillStyle = '#404040';
     ctx.fillRect(0, 200, 256, 56);
 
-    // Add tread pattern on sole
     ctx.fillStyle = '#606060';
     for (let i = 0; i < 8; i++) {
         for (let j = 0; j < 4; j++) {
             ctx.fillRect(10 + i * 30, 210 + j * 10, 20, 5);
         }
     }
-
-    // Add boot reinforcement areas
     ctx.fillStyle = '#E0E0E0';
     ctx.fillRect(20, 50, 216, 30);
     ctx.fillRect(50, 100, 156, 40);
 
-    // Add lace/strap areas
     ctx.strokeStyle = '#C0C0C0';
     ctx.lineWidth = 3;
     for (let i = 0; i < 6; i++) {
@@ -570,7 +546,6 @@ window.onload = function init() {
     uAmbientLight = gl.getUniformLocation(program, "uAmbientLight");
     uDiffuseStrength = gl.getUniformLocation(program, "uDiffuseStrength");
 
-        //camera
     document.getElementById("cameraSlider").addEventListener("input", (e) => {
         const t = parseFloat(e.target.value);
         eye = lerpVec3(cameraStart, cameraEnd, t);
@@ -579,15 +554,11 @@ window.onload = function init() {
     document.addEventListener("keydown", (e) => {
         const key = e.key.toLowerCase();
         const step = 0.1;
-
-        // 카메라가 at 쪽을 향하는 단위 벡터
         const viewDir = normalize(subtract(at, eye));
 
         if (key === "m") {
-            // 확대: 앞으로 전진
             eye = add(eye, scale(step, viewDir));
         } else if (key === "n") {
-            // 축소: 뒤로 후퇴
             eye = subtract(eye, scale(step, viewDir));
         }
         modelViewMatrix = lookAt(eye, at, up);
@@ -900,11 +871,7 @@ function render(time = 0) {
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    //const result = animationSystem.updateAnimation(deltaTime);
-    //if (result) animationSystem.applyAnimationToTree(root, result.rotations, result.translations);
-
-    const result = updateAnimations(deltaTime, root);
-
+    updateAnimations(deltaTime, root);
 
     renderGround();
     traverse(root);
